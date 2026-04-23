@@ -19,6 +19,7 @@ class CreateTicketRequest(BaseModel):
     subject: str = Field(..., description="Ticket subject")
     message: str = Field(..., description="Ticket message/description")
     priority: Optional[int] = Field(default=3, description="Priority level (1-4)")
+    source: Optional[str] = Field(default="api", description="Ticket source (api, whatsapp, email, etc)")
     ip: Optional[str] = Field(default="127.0.0.1", description="Client IP address")
 
 

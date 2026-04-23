@@ -1,0 +1,219 @@
+/* ============================================================================
+   Login Page — Glassmorphism
+   ============================================================================ */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+/* ── Background Orbs ── */
+.login-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+}
+
+.bg-orb-1 {
+  width: 400px;
+  height: 400px;
+  background: var(--accent);
+  top: -100px;
+  right: -80px;
+  animation: float 12s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+  width: 300px;
+  height: 300px;
+  background: #818cf8;
+  bottom: -60px;
+  left: -60px;
+  animation: float 15s ease-in-out infinite reverse;
+}
+
+.bg-orb-3 {
+  width: 200px;
+  height: 200px;
+  background: var(--success);
+  top: 50%;
+  left: 50%;
+  animation: float 10s ease-in-out infinite 3s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -20px) scale(1.05); }
+  66% { transform: translate(-20px, 20px) scale(0.95); }
+}
+
+/* ── Card ── */
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  position: relative;
+  z-index: 2;
+  animation: fadeIn 0.6s ease;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.login-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.login-header p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+/* ── Form ── */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group input {
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 15px;
+  font-family: var(--font-sans);
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.form-group input::placeholder {
+  color: var(--text-muted);
+}
+
+.form-group input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.form-group input:disabled {
+  opacity: 0.5;
+}
+
+/* ── Error ── */
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--danger-muted);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+/* ── Button ── */
+.login-btn {
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent), #818cf8);
+  color: var(--text-inverse);
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+  margin-top: 4px;
+}
+
+.login-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+.login-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner-sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+  border-top-color: var(--text-inverse);
+}
+
+/* ── Footer ── */
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.login-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.login-hint code {
+  background: var(--bg-surface);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}

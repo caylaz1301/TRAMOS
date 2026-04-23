@@ -7,15 +7,17 @@ AI-powered WhatsApp support system for fleet management
 
 import logging
 from typing import Optional
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.routes import tickets, whatsapp
+from app.routes import tickets, whatsapp, analytics, auth
 from app.database_models import DatabaseManager
-from app.services import init_conversation_manager
+from app.services.chatbot.session_manager import init_session_manager
+from app.services.database_tracker import init_db_tracker
 
 # ============================================================================
 # LOGGING CONFIGURATION
@@ -59,11 +61,14 @@ async def lifespan(app: FastAPI):
         db_manager = DatabaseManager(settings.DATABASE_URL)
         db_manager.init_db()
         
-        # Initialize conversation manager with database session
-        session = db_manager.get_session()
-        init_conversation_manager(session)
+        # Initialize session manager with database
+        init_session_manager(db_manager.SessionLocal)
         
-        logger.info("✅ Database & ConversationManager initialized")
+        # Initialize database tracker for all table writes
+        init_db_tracker()
+        
+        logger.info("✅ Database initialized")
+        logger.info("✅ Session Manager initialized with database persistence")
     except Exception as e:
         logger.warning(f"⚠️ Database init failed: {e}")
         logger.warning("Running without database persistence")
@@ -71,7 +76,7 @@ async def lifespan(app: FastAPI):
     # Log service status
     logger.info(f"osTicket: {'✅ Configured' if settings.OSTICKET_API_KEY else '❌ Not configured'}")
     logger.info(f"WhatsApp: {'✅ Configured' if settings.WHATSAPP_API_TOKEN else '❌ Not configured'}")
-    logger.info(f"Gemini AI: {'✅ Configured' if settings.GEMINI_API_KEY else '❌ Not configured'}")
+    logger.info(f"Ollama AI: ✅ Local (localhost:11434)")
     logger.info("=" * 50)
     
     yield
@@ -106,6 +111,8 @@ app.add_middleware(
 # Register routers
 app.include_router(tickets.router)
 app.include_router(whatsapp.router)
+app.include_router(analytics.router)
+app.include_router(auth.router)
 
 
 # ============================================================================
@@ -141,13 +148,67 @@ async def root():
 
 @app.get("/health", tags=["system"])
 async def health_check():
-    """Health check endpoint for monitoring"""
-    return {
+    """Enhanced health check endpoint for monitoring - checks all system components"""
+    import httpx
+    from app.utils.ai_logic import ai_engine
+    
+    health_status = {
         "status": "healthy",
         "service": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "database": "connected" if db_manager else "not configured"
+        "timestamp": datetime.now().isoformat(),
+        "components": {}
     }
+    
+    # Check database
+    db_status = "connected"
+    try:
+        if not db_manager:
+            db_status = "not_configured"
+        else:
+            # Try to get a session to verify connectivity
+            session = db_manager.get_session()
+            session.close()
+    except Exception as e:
+        db_status = f"error: {str(e)[:30]}"
+    health_status["components"]["database"] = db_status
+    
+    # Check AI engine (Ollama)
+    ai_status = "unknown"
+    try:
+        if ai_engine:
+            # Check if ollama is reachable
+            try:
+                result = ai_engine.analyze_user_input("test")
+                ai_status = "operational" if result else "degraded"
+            except:
+                ai_status = "unreachable"
+    except:
+        ai_status = "not_configured"
+    health_status["components"]["ai_engine"] = ai_status
+    
+    # Check WhatsApp API configuration
+    whatsapp_status = "configured" if settings.WHATSAPP_API_TOKEN else "not_configured"
+    health_status["components"]["whatsapp_api"] = whatsapp_status
+    
+    # Check osTicket configuration
+    osticket_status = "configured" if settings.OSTICKET_API_KEY else "not_configured"
+    health_status["components"]["osticket"] = osticket_status
+    
+    # Check KB system
+    kb_status = "loaded"
+    try:
+        from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
+        kb_status = f"loaded ({len(KB_TROUBLESHOOTING)} solutions)"
+    except:
+        kb_status = "error"
+    health_status["components"]["knowledge_base"] = kb_status
+    
+    # Overall status
+    if "error" in str(health_status.get("components", {})) or ai_status == "unreachable":
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 
 @app.get("/config/status", tags=["system"])
@@ -159,7 +220,7 @@ async def config_status():
             "osticket": bool(settings.OSTICKET_API_KEY),
             "whatsapp": bool(settings.WHATSAPP_API_TOKEN),
             "database": bool(db_manager),
-            "gemini_ai": bool(settings.GEMINI_API_KEY),
+            "ai_engine": "ollama_local",
         },
         "webhook_path": settings.WEBHOOK_PATH,
     }

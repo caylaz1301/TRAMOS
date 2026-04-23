@@ -7,18 +7,55 @@ Multi-turn conversation dengan AI intent detection dan KB troubleshooting
 import logging
 import json
 from typing import Optional, Tuple
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, Query
 from fastapi.responses import Response
 
 from app.config import settings
 from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING, get_kb_category
 from app.utils.ai_logic import ai_engine
 from app.services.osticket_service import osticket_service
-from app.services.whatsapp_service import whatsapp_service
+from app.services.chatbot.whatsapp_service import whatsapp_service
+from app.services.chatbot import session_manager as sm_module
+from app.services.chatbot.session_manager import DialogState
+from app.services.chatbot.dialog_flow_handler import DialogFlowHandler
+from app.services.chatbot.smart_dialog_flow import SmartDialogFlowHandler
+from app.services.chatbot.nlp_extractor import problem_extractor
 from app.schemas.ticket import CreateTicketRequest
+from app.services.database_tracker import db_tracker
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["whatsapp"])
+
+# ============================================================================
+# MESSAGE DEDUPLICATION - Prevent duplicate webhook processing
+# Meta can send the same webhook event multiple times
+# ============================================================================
+_processed_message_ids: dict = {}  # {message_id: timestamp}
+_DEDUP_WINDOW = 30  # seconds to keep message IDs
+
+def _is_duplicate_message(message_id: str) -> bool:
+    """Check if this message was already processed (Meta duplicate webhook)"""
+    import time
+    now = time.time()
+    
+    # Clean old entries (older than dedup window)
+    expired = [mid for mid, ts in _processed_message_ids.items() if now - ts > _DEDUP_WINDOW]
+    for mid in expired:
+        del _processed_message_ids[mid]
+    
+    if message_id in _processed_message_ids:
+        logger.warning(f"⚠️ Duplicate message detected: {message_id}, skipping")
+        return True
+    
+    _processed_message_ids[message_id] = now
+    return False
+
+
+def get_session_manager():
+    """Get the globally initialized session manager"""
+    return sm_module.session_manager
+
+
 
 
 # ============================================================================
@@ -26,9 +63,9 @@ router = APIRouter(prefix="", tags=["whatsapp"])
 # ============================================================================
 @router.get("/webhook/whatsapp")
 async def verify_webhook(
-    hub_mode: str = None,
-    hub_challenge: str = None,
-    hub_verify_token: str = None,
+    hub_mode: str = Query(None, alias="hub.mode"),
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+    hub_verify_token: str = Query(None, alias="hub.verify_token"),
 ) -> Response:
     """
     Webhook verification dari Meta WhatsApp Business API
@@ -56,8 +93,8 @@ async def handle_incoming_message(request: Request) -> Response:
     
     Flow:
     1. Parse incoming message
-    2. Detect intent menggunakan AI (Gemini) + fallback keyword
-    3. Generate response berdasarkan intent dan KB
+    2. Detect intent using smart dialog flow + KB search
+    3. Generate response based on intent and KB
     4. Send response back via WhatsApp API
     """
     try:
@@ -101,6 +138,15 @@ async def handle_incoming_message(request: Request) -> Response:
                 media_type="application/json"
             )
         
+        # ====== DEDUPLICATION: Skip if already processed ======
+        wa_message_id = message.get("id", "")
+        if wa_message_id and _is_duplicate_message(wa_message_id):
+            return Response(
+                content=json.dumps({"status": "ok", "duplicate": True}), 
+                media_type="application/json",
+                status_code=200
+            )
+        
         # Get user profile
         contacts = value.get("contacts", [{}])[0]
         user_name = contacts.get("profile", {}).get("name", "User")
@@ -114,15 +160,21 @@ async def handle_incoming_message(request: Request) -> Response:
             phone_number=from_phone
         )
         
+        # Debug: Log response content
+        logger.debug(f"Response content: '{response_text[:200]}...' (length: {len(response_text)})")
+        
         # ====== SEND RESPONSE VIA WHATSAPP ======
         if whatsapp_service.is_configured():
-            send_success = await whatsapp_service.send_message(from_phone, response_text)
-            if send_success:
-                logger.info(f"✅ Response sent to {from_phone}")
+            if not response_text or response_text.strip() == "":
+                logger.warning(f"⚠️ Response is empty for {from_phone}, skipping send")
             else:
-                logger.warning(f"⚠️ Failed to send response to {from_phone}")
+                send_success = await whatsapp_service.send_message(from_phone, response_text)
+                if send_success:
+                    logger.info(f"✅ Response sent to {from_phone}")
+                else:
+                    logger.warning(f"⚠️ Failed to send response to {from_phone}")
         else:
-            logger.debug(f"📝 Response (not sent): {response_text[:100]}")
+            logger.info(f"📝 Response (not sent - sandbox mode): {response_text[:100]}")
         
         return Response(
             content=json.dumps({"status": "ok"}), 
@@ -157,66 +209,456 @@ async def process_message_with_ai(
     phone_number: str
 ) -> str:
     """
-    Process message menggunakan AI intent detection + KB troubleshooting
+    Process message menggunakan SESSION-AWARE AI with dialog flow management
     
-    Intent types:
-    - greeting: Salam pembuka
-    - troubleshooting: Masalah teknis yang perlu solusi
-    - escalate: User minta bicara dengan manusia
-    - resolved: Masalah sudah selesai
-    - unresolved: Solusi tidak berhasil
-    - ticket: Minta buat tiket support
-    - unknown: Tidak terdeteksi
+    Enhanced flow:
+    1. Get or create conversation session
+    2. Route through dialog state machine (greeting → name → problem → unit → location → time → confirm → ticket)
+    3. Collect structured data via dialog flow
+    4. Generate contextual, natural responses
+    5. Create ticket when data is complete
     """
+    import time as _time
+    _turn_start = _time.time()
     message_lower = message_body.lower()
     
-    # ===== DETECT INTENT WITH AI =====
-    intent, category = ai_engine.detect_intent(message_body)
-    logger.info(f"🤖 Intent: {intent}, Category: {category}")
+    # ===== SESSION MANAGEMENT =====
+    # Get or create session for this user
+    session_manager = get_session_manager()
+    session = session_manager.get_or_create_session(phone_number)
+    session.update_activity()
     
-    # ===== HANDLE BASED ON INTENT =====
+    logger.info(
+        f"💬 [{phone_number}] {user_name} | State: {session.current_state.value} | Message: {message_body[:60]}"
+    )
     
-    # 1. Greeting
-    if is_greeting(message_lower):
-        return generate_greeting_response(user_name)
+    # ===== DATABASE TRACKING: ensure user + conversation exist =====
+    _user_id = db_tracker.get_or_create_user(phone_number, user_name)
+    # Use get_or_create to survive server restart / cache miss
+    if not getattr(session, '_db_conversation_id', None):
+        session._db_conversation_id = db_tracker.get_or_create_conversation(phone_number, _user_id) if _user_id else None
     
-    # 2. Resolved - user confirms issue is fixed
-    if intent == "resolved":
-        return generate_resolved_response(user_name)
+    # ===== DIALOG FLOW ROUTING =====
+    # Dialog state machine handles structured data collection
     
-    # 3. Unresolved - solution didn't work
-    if intent == "unresolved":
-        return generate_unresolved_response(user_name, category)
+    if session.current_state == DialogState.GREETING:
+        # First message - greet and ask for name
+        session.add_message(sender="user", message=message_body, intent="greeting", category=None)
+        response, next_state = DialogFlowHandler._handle_greeting(session)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="greeting", category=None)
+        get_session_manager().save_session(session)
+        # DB tracking
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="greeting", processing_time_ms=_ms)
+        return response
     
-    # 4. Escalate - user wants human support
-    if intent == "escalate" or is_escalation_request(message_lower):
-        return await handle_escalation(user_name, phone_number, message_body, category)
+    elif session.current_state == DialogState.COLLECTING_NAME:
+        # Collect driver name - delegate to SmartDialogFlowHandler for validation
+        session.add_message(sender="user", message=message_body, intent="data_collection", category=None)
+        
+        response, next_state = SmartDialogFlowHandler._handle_name_input(session, message_body)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="data_collection", category=None)
+        get_session_manager().save_session(session)
+        # DB tracking
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="data_collection", processing_time_ms=_ms)
+            if session.driver_name:
+                db_tracker.update_user_name(phone_number, session.driver_name)
+        return response
     
-    # 5. Ticket creation request
-    if is_ticket_request(message_lower):
-        return await handle_ticket_creation(user_name, phone_number, message_body)
+    elif session.current_state == DialogState.COLLECTING_PROBLEM:
+        # Collect problem description + extract category
+        session.problem_description = message_body.strip()
+        session.add_message(sender="user", message=message_body, intent="data_collection", category=None)
+        
+        # Use keyword analysis (same as SmartDialogFlowHandler.analyze_problem) for consistency
+        analysis = SmartDialogFlowHandler.analyze_problem(message_body)
+        session.problem_category = analysis.get('category') or 'Service'
+        session.problem_severity = analysis.get('severity', 'medium')
+        
+        # Also try NLP extractor as fallback if category is still generic
+        if session.problem_category == 'Service':
+            problem_details = problem_extractor.extract_problem_details(message_body)
+            extracted_cat = problem_details.get('category', 'Service')
+            if extracted_cat != 'Service':
+                session.problem_category = extracted_cat
+                session.problem_severity = problem_details.get('severity', session.problem_severity)
+        
+        logger.debug(f"📊 Problem extraction: Category={session.problem_category}, Severity={session.problem_severity}")
+        
+        # Search for KB solution and get feedback directly
+        response, next_state = DialogFlowHandler._search_kb_solution(session)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="solution_search", category=session.problem_category)
+        get_session_manager().save_session(session)
+        # DB tracking
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="solution_search", category=session.problem_category, processing_time_ms=_ms)
+            db_tracker.update_conversation_state(session._db_conversation_id,
+                next_state.value, category=session.problem_category,
+                issue_description=session.problem_description)
+            # Log solution attempt if KB solution was found
+            if session.kb_solution:
+                session._db_solution_attempt_id = db_tracker.log_solution_attempt(
+                    conversation_id=session._db_conversation_id,
+                    phone_number=phone_number,
+                    solution_id=session.kb_solution.get('category', 'unknown'),
+                    category=session.problem_category or 'Service',
+                    problem_description=session.problem_description or '',
+                    kb_match_score=session.kb_solution.get('confidence'),
+                )
+        return response
     
-    # 6. Troubleshooting - technical issue
-    if intent == "troubleshooting" and category:
-        return generate_troubleshooting_response(category, user_name)
+    elif session.current_state == DialogState.ASKING_SOLUTION_WORKED:
+        # Get user feedback on KB solution - use SmartDialogFlowHandler for consistent matching
+        session.add_message(sender="user", message=message_body, intent="solution_feedback", category=session.problem_category)
+        
+        response, next_state = SmartDialogFlowHandler._handle_solution_feedback(session, message_body)
+        session.current_state = next_state
+        
+        if next_state == DialogState.RESOLVED:
+            logger.info(f"✅ KB solution worked for {phone_number}")
+        elif next_state == DialogState.COLLECTING_UNIT:
+            logger.info(f"❌ KB solution didn't work, escalating for {phone_number}")
+        
+        session.add_message(sender="bot", message=response, intent="solution_feedback", category=session.problem_category)
+        get_session_manager().save_session(session)
+        # DB tracking
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="solution_feedback", category=session.problem_category, processing_time_ms=_ms)
+            # Update solution attempt outcome
+            attempt_id = getattr(session, '_db_solution_attempt_id', None)
+            # Fallback: recover from DB if lost (e.g. server restart)
+            if not attempt_id and session._db_conversation_id:
+                attempt_id = db_tracker.get_active_solution_attempt(session._db_conversation_id)
+            if attempt_id:
+                if next_state == DialogState.RESOLVED:
+                    db_tracker.update_solution_outcome(attempt_id, 'worked')
+                    db_tracker.update_user_profile(phone_number, session.problem_category, issue_resolved=True)
+                    # AI resolution analytics
+                    conv_duration = (session.last_activity - session.created_at).total_seconds() / 60
+                    db_tracker.create_ai_resolution(
+                        session._db_conversation_id, phone_number,
+                        session.problem_category, resolution_time_minutes=int(conv_duration))
+                elif next_state == DialogState.COLLECTING_UNIT:
+                    db_tracker.update_solution_outcome(attempt_id, 'escalated', escalation_needed=True)
+        return response
     
-    # 7. Try KB matching as fallback
-    words = message_lower.split()
-    kb_category = get_kb_category(words)
-    if kb_category:
-        return generate_kb_response(kb_category, user_name)
+    elif session.current_state == DialogState.COLLECTING_UNIT:
+        # Collect vehicle unit/equipment ID - delegate to SmartDialogFlowHandler for validation
+        session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
+        
+        response, next_state = SmartDialogFlowHandler._handle_unit_input(session, message_body)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+        get_session_manager().save_session(session)
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+        return response
     
-    # 8. Status check
-    if is_status_check(message_lower):
-        return "✅ Sistem sedang berjalan normal.\n\nAda masalah spesifik? Cerita dong detailnya! 💪"
+    elif session.current_state == DialogState.COLLECTING_LOCATION:
+        # Collect location - delegate to SmartDialogFlowHandler for validation
+        session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
+        
+        response, next_state = SmartDialogFlowHandler._handle_location_input(session, message_body)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+        get_session_manager().save_session(session)
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+        return response
     
-    # 9. Fallback
-    return generate_fallback_response(user_name)
+    elif session.current_state == DialogState.COLLECTING_TIME:
+        # Use SmartDialogFlowHandler to parse time properly (not raw text)
+        session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
+        
+        response, next_state = SmartDialogFlowHandler._handle_time_input(session, message_body)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+        get_session_manager().save_session(session)
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, next_state.value,
+                intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+        return response
+    
+    elif session.current_state == DialogState.CONFIRMING_DETAILS:
+        # Confirm all collected data before creating ticket
+        session.add_message(sender="user", message=message_body, intent="confirmation", category=session.problem_category)
+        
+        # Check if user is providing more problem details instead of confirmation
+        # (e.g., saying "gps error mulu" when bot asked "jelaskan lebih detail")
+        detail_keywords = ['error', 'rusak', 'mogok', 'mati', 'offline', 'tidak bisa', 'problema', 'masalah', 'issue', 'gagal', 'failed']
+        is_detail_response = any(keyword in message_lower for keyword in detail_keywords)
+        
+        if is_detail_response and len(message_body) > 5:
+            # User is providing detail, not confirmation - re-process as problem detail
+            session.problem_description = message_body.strip()
+            
+            # Re-extract category from new detail
+            problem_details = problem_extractor.extract_problem_details(message_body)
+            if problem_details.get('category') != 'Service':
+                # Better category found, update it
+                session.problem_category = problem_details.get('category', session.problem_category)
+            
+            session.problem_severity = problem_details.get('severity', session.problem_severity)
+            logger.info(f"Re-extracted problem: {session.problem_category} from user detail: {message_body[:50]}")
+            
+            # Go back and search KB with updated problem
+            response, next_state = DialogFlowHandler._search_kb_solution(session)
+            session.current_state = next_state
+            session.add_message(sender="bot", message=response, intent="solution_search", category=session.problem_category)
+            get_session_manager().save_session(session)
+            # DB tracking
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="solution_search", category=session.problem_category, processing_time_ms=_ms)
+            return response
+        
+        # Normal confirmation handling (yes/no)
+        response, next_state = SmartDialogFlowHandler._handle_confirmation(session, message_body)
+        
+        if next_state == DialogState.CREATING_TICKET:
+            # User confirmed - proceed to ticket creation
+            session.current_state = next_state
+            session.add_message(sender="bot", message=response, intent="confirmation", category=session.problem_category)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="confirmation", category=session.problem_category, processing_time_ms=_ms)
+            return await _create_ticket_from_session(session, phone_number, user_name)
+        elif next_state == DialogState.COLLECTING_UNIT:
+            # User wants to change data - start unit collection again
+            session.current_state = next_state
+            session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+            get_session_manager().save_session(session)
+            # DB tracking
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+            return response
+        else:
+            # Clarification needed - ask again
+            session.current_state = next_state
+            session.add_message(sender="bot", message=response, intent="confirmation", category=session.problem_category)
+            get_session_manager().save_session(session)
+            # DB tracking
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="confirmation", category=session.problem_category, processing_time_ms=_ms)
+            return response
+    
+    elif session.current_state == DialogState.CLOSED or session.current_state == DialogState.RESOLVED:
+        # Close old conversation in DB before starting a new one
+        old_conv_id = getattr(session, '_db_conversation_id', None)
+        if old_conv_id:
+            db_tracker.close_conversation(old_conv_id, session.current_state.value)
+        
+        # Session closed/resolved - start fresh conversation
+        session_manager.close_session(phone_number)
+        session = session_manager.create_session(phone_number)
+        session.add_message(sender="user", message=message_body, intent="greeting", category=None)
+        response, next_state = DialogFlowHandler._handle_greeting(session)
+        session.current_state = next_state
+        session.add_message(sender="bot", message=response, intent="greeting", category=None)
+        get_session_manager().save_session(session)
+        
+        # DB tracking for new conversation
+        _user_id_new = db_tracker.get_or_create_user(phone_number, user_name)
+        if _user_id_new:
+            session._db_conversation_id = db_tracker.create_conversation(phone_number, _user_id_new)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="greeting", processing_time_ms=_ms)
+        return response
+    
+    # Fallback - shouldn't reach here
+    return "Terjadi kesalahan. Silakan mulai percakapan baru dengan mengirim 'halo'."
 
 
-# ============================================================================
-# INTENT DETECTION HELPERS
-# ============================================================================
+async def _create_ticket_from_session(session, phone_number: str, user_name: str) -> str:
+    """Create osTicket from collected session data"""
+    
+    try:
+        # Prepare ticket data
+        driver_name = session.driver_name or "Unknown Driver"
+        subject = f"[{session.problem_category}] Issue Report - {driver_name}"
+        
+        # Safely handle None values in message body
+        problem_desc = session.problem_description or "Tidak ada deskripsi"
+        equipment = session.vehicle_unit or "Tidak disebutkan"
+        location = session.location or "Tidak disebutkan"
+        issue_time = session.issue_time or "Tidak disebutkan"
+        problem_cat = session.problem_category or "Service"
+        severity = session.problem_severity or "medium"
+        
+        # Clean ticket message - ONLY essential info, NOT conversation history
+        message_body = f"""
+Driver Information:
+- Name: {session.driver_name}
+- Phone: {phone_number}
+
+Issue Details:
+- Description: {problem_desc}
+- Category: {problem_cat}
+- Severity: {severity}
+- Equipment: {equipment}
+- Location: {location}
+- Time Reported: {issue_time}
+        """
+        
+        # Determine priority from severity
+        priority_map = {
+            'critical': 1,
+            'high': 2,
+            'medium': 3,
+            'low': 4
+        }
+        priority = priority_map.get(severity, 3)
+        
+        # Create ticket in osTicket
+        ticket_request = CreateTicketRequest(
+            name=session.driver_name or user_name,
+            email=f"{phone_number}@whatsapp.tramos.id",
+            subject=subject,
+            message=message_body.strip(),
+            source="whatsapp",
+            ip="127.0.0.1"
+        )
+        
+        result = await osticket_service.create_ticket(ticket_request)
+        
+        if result.success:
+            session.ticket_id = result.ticket_id
+            session.current_state = DialogState.CLOSED
+            
+            response = (
+                f"✅ **Tiket Berhasil Dibuat!**\n\n"
+                f"📌 Nomor Tiket: #{result.ticket_id}\n"
+                f"🏷️ Kategori: {session.problem_category}\n"
+                f"🚗 Equipment: {session.vehicle_unit}\n"
+                f"📍 Lokasi: {session.location}\n"
+                f"⏰ Waktu: {session.issue_time}\n\n"
+                f"Tim support TRAMOS akan segera menangani masalah Anda.\n"
+                f"Kami akan menghubungi Anda berdasarkan detail yang Anda berikan.\n\n"
+                f"Terima kasih telah melaporkan! 🙏"
+            )
+            
+            session.add_message(sender="bot", message=response, intent="ticket_created", category=session.problem_category)
+            
+            # Save session to database with ticket ID and closed state
+            get_session_manager().save_session(session)
+            
+            # ===== DB TRACKING: ticket + resolution + analytics =====
+            _user_id = db_tracker.get_or_create_user(phone_number, session.driver_name)
+            _conv_id = getattr(session, '_db_conversation_id', None)
+            if _user_id and _conv_id:
+                try:
+                    osticket_id_int = int(result.ticket_id) if result.ticket_id else None
+                except (ValueError, TypeError):
+                    osticket_id_int = None
+                
+                # Create ticket record
+                _ticket_id = db_tracker.create_ticket_record(
+                    user_id=_user_id,
+                    phone_number=phone_number,
+                    conversation_id=_conv_id,
+                    osticket_id=osticket_id_int,
+                    subject=subject,
+                    description=message_body.strip(),
+                    category=session.problem_category or "Service",
+                    priority=severity,
+                )
+                
+                # Create resolution record
+                if _ticket_id:
+                    conv_duration = (session.last_activity - session.created_at).total_seconds() / 60
+                    db_tracker.create_resolution(
+                        ticket_id=_ticket_id,
+                        resolution_type="escalated",
+                        resolution_notes=f"Escalated via WhatsApp. KB solution {'tried' if session.tried_kb_solution else 'not available'}.",
+                        ai_attempted=session.tried_kb_solution,
+                        ai_successful=False,
+                        resolution_time_minutes=int(conv_duration),
+                    )
+                
+                # Increment user ticket count
+                db_tracker.increment_user_tickets(phone_number)
+                
+                # Update user profile
+                db_tracker.update_user_profile(phone_number, session.problem_category, issue_resolved=False)
+                
+                # Log ticket analytics
+                db_tracker.log_analytics("ticket_volume", 1.0, session.problem_category or "Service",
+                    conversation_id=_conv_id, ticket_id=_ticket_id)
+                
+                # Link ticket to conversation record
+                if _ticket_id:
+                    db_tracker.link_ticket_to_conversation(_conv_id, _ticket_id)
+                
+                # Update conversation state to closed
+                db_tracker.update_conversation_state(_conv_id, "closed",
+                    category=session.problem_category, intent="ticket_created")
+                
+                # Update dashboard
+                db_tracker.update_dashboard_summary()
+            
+            logger.info(f"✅ Ticket #{result.ticket_id} created from session {session.session_id}")
+            return response
+        else:
+            # Ticket creation failed
+            session.add_message(sender="bot", message="Error creating ticket", intent="error", category=None)
+            
+            # Save failed attempt to database
+            get_session_manager().save_session(session)
+            
+            logger.error(f"Failed to create ticket: {result.error}")
+            return (
+                f"❌ Maaf {session.driver_name}, gagal membuat tiket.\n\n"
+                f"Silakan coba lagi atau hubungi support langsung.\n"
+                f"Error: {result.error}"
+            )
+    
+    except Exception as e:
+        logger.error(f"Error in ticket creation: {e}", exc_info=True)
+        session.add_message(sender="bot", message="Error during ticket creation", intent="error", category=None)
+        get_session_manager().save_session(session)
+        return (
+            f"❌ Terjadi kesalahan saat membuat tiket.\n\n"
+            f"Silakan coba lagi atau hubungi support."
+        )
+
 
 def is_greeting(message: str) -> bool:
     """Check if message is a greeting"""
@@ -310,6 +752,7 @@ async def handle_escalation(
         email=f"{phone_number}@whatsapp.tramos.id",
         subject=subject,
         message=f"Eskalasi dari WhatsApp:\n\nPesan terakhir: {message}\nKategori: {category or 'Tidak terdeteksi'}",
+        source="whatsapp",
         ip="127.0.0.1"
     )
     
@@ -340,6 +783,7 @@ async def handle_ticket_creation(
         email=f"{phone_number}@whatsapp.tramos.id",
         subject=f"WhatsApp Support: {user_name}",
         message=f"Dari WhatsApp ({phone_number}):\n\n{message}",
+        source="whatsapp",
         ip="127.0.0.1"
     )
     

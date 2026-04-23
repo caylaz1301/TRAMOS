@@ -1,21 +1,27 @@
-"""Services package"""
+"""
+Services Package - Organized into specialized modules
+
+Modules:
+- chatbot/: WhatsApp dialog flow, conversation management, NLP, websocket handling
+- data_science/: Analytics, patterns, predictions, anomaly detection, benchmarking
+- Root level: osTicket integration (ticket management)
+"""
+
 from .osticket_service import osticket_service, osTicketService
-from .whatsapp_service import whatsapp_service, WhatsAppService
-from .conversation_manager import (
-    ConversationManager,
-    init_conversation_manager,
-    get_conversation_manager
-)
+from .chatbot.whatsapp_service import whatsapp_service, WhatsAppService
+
+# Import submodules for easy access
+from . import chatbot
+from . import data_science
 
 __all__ = [
-    # osTicket
+    # osTicket integration
     "osticket_service",
     "osTicketService",
-    # WhatsApp
+    # WhatsApp service
     "whatsapp_service",
     "WhatsAppService",
-    # Conversation Manager (database-backed)
-    "ConversationManager",
-    "init_conversation_manager",
-    "get_conversation_manager",
+    # Submodules
+    "chatbot",
+    "data_science",
 ]

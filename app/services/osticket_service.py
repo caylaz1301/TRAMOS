@@ -2,8 +2,10 @@
 import httpx
 import logging
 from typing import Optional, Dict, Any
+from datetime import datetime
 from app.config import settings
 from app.schemas.ticket import CreateTicketRequest, CreateTicketResponse
+from app.services.notification_service import email_notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +32,20 @@ class osTicketService:
             CreateTicketResponse with success status and ticket ID
         """
         try:
+            # osTicket API requires valid registered email
+            # Fallback to admin email if provided email is not registered in osTicket
+            email = ticket_data.email
+            # Common pattern: WhatsApp tickets use whatsapp.tramos.id domain
+            if email.endswith("@whatsapp.tramos.id"):
+                email = "adm.helpdesk.tramos@gmail.com"
+            
             payload = {
                 "name": ticket_data.name,
-                "email": ticket_data.email,
+                "email": email,
                 "subject": ticket_data.subject,
                 "message": ticket_data.message,
-                "ip": ticket_data.ip,
-                # Note: priority field is not supported by osTicket API
-                # It will be set via dashboard if needed
+                "source": "api",  # osTicket API only accepts "api" as source
             }
-            
-            logger.debug(f"Creating ticket with payload: {payload}")
-            logger.debug(f"osTicket endpoint: {self.base_url}/tickets.json")
             
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.post(
@@ -50,15 +54,32 @@ class osTicketService:
                     headers=self.headers
                 )
             
-            logger.debug(f"osTicket API response status: {response.status_code}")
-            logger.debug(f"osTicket API response body: {response.text}")
-            
             # osTicket API returns 201 on success
             if response.status_code == 201:
                 # osTicket API returns plain text ticket ID
                 try:
                     ticket_id = response.text.strip()
                     logger.info(f"✅ Ticket created successfully: {ticket_id}")
+                    
+                    # Send email notification to operators
+                    ticket_notification_data = {
+                        'ticket_id': ticket_id,
+                        'subject': ticket_data.subject,
+                        'user_name': ticket_data.name,
+                        'user_contact': getattr(ticket_data, 'phone', ticket_data.email),
+                        'category': getattr(ticket_data, 'category', 'General'),
+                        'priority': self._convert_priority_to_string(getattr(ticket_data, 'priority', 'normal')),
+                        'message': ticket_data.message,
+                        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    # Send email asynchronously (non-blocking)
+                    try:
+                        email_notification_service.send_new_ticket_notification(ticket_notification_data)
+                    except Exception as email_error:
+                        logger.warning(f"⚠️ Failed to send email notification: {str(email_error)}")
+                        # Don't fail ticket creation if email fails
+                    
                     return CreateTicketResponse(
                         success=True,
                         ticket_id=str(ticket_id),
@@ -75,7 +96,7 @@ class osTicketService:
             else:
                 try:
                     error_msg = f"osTicket API returned {response.status_code}: {response.text}"
-                except:
+                except Exception:
                     error_msg = f"osTicket API returned {response.status_code}"
                 logger.error(error_msg)
                 return CreateTicketResponse(
@@ -122,8 +143,6 @@ class osTicketService:
                 "ip": ticket_data.ip,
             }
             
-            logger.debug(f"Creating ticket with payload: {payload}")
-            
             with httpx.Client(timeout=10.0) as client:
                 response = client.post(
                     f"{self.base_url}/tickets.json",
@@ -160,6 +179,18 @@ class osTicketService:
     def is_configured(self) -> bool:
         """Check if osTicket API is properly configured"""
         return bool(self.base_url and self.api_key)
+    
+    def _convert_priority_to_string(self, priority) -> str:
+        """Convert priority (int or string) to readable string"""
+        if isinstance(priority, int):
+            priority_map = {
+                1: "critical",
+                2: "high",
+                3: "normal",
+                4: "low"
+            }
+            return priority_map.get(priority, "normal")
+        return str(priority).lower()
 
 
 # Singleton instance

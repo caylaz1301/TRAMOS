@@ -5,17 +5,19 @@ TRAMOS (Tracking Monitor Safety) is an enterprise-grade AI-powered WhatsApp supp
 ## Features
 
 ✅ **WhatsApp Integration** - Receive and respond to driver messages via Meta WhatsApp Business API  
-✅ **AI Intent Detection** - Understand what drivers need using Google Gemini AI  
-✅ **Knowledge Base** - Provide automated troubleshooting steps for GPS, connectivity, etc  
-✅ **Automatic Ticketing** - Create osTicket tickets from conversations  
+✅ **Ultra-Smart Dialog** - AI-powered conversation with 6-dimensional problem analysis  
+✅ **Knowledge Base** - Automated troubleshooting with KB solution search & user feedback  
+✅ **Automatic Ticketing** - Create osTicket tickets from conversations with full context  
 ✅ **Multi-turn Conversations** - Remember context with PostgreSQL persistence  
+✅ **Analytics Dashboard** - React-based real-time metrics & reporting  
 ✅ **Async Architecture** - High performance with httpx async HTTP client  
 
 ## Tech Stack
 
 - **Backend**: Python 3.10+, FastAPI
 - **Database**: PostgreSQL + SQLAlchemy
-- **AI/LLM**: Google Gemini
+- **AI/LLM**: Ollama (localhost) + Mistral 7B
+- **Frontend**: React 18+ with Vite
 - **Ticketing**: osTicket API
 - **Messaging**: Meta WhatsApp Business API
 - **HTTP Client**: httpx (async)
@@ -32,17 +34,28 @@ TRAMOS/
 │   ├── database_models.py             # SQLAlchemy models
 │   ├── routes/
 │   │   ├── whatsapp.py               # WhatsApp webhook handler
-│   │   └── tickets.py                # Ticket API endpoints
+│   │   ├── tickets.py                # Ticket API endpoints
+│   │   ├── analytics.py              # Analytics API
+│   │   └── auth.py                   # JWT authentication
 │   ├── schemas/
 │   │   ├── whatsapp.py               # WhatsApp data models
 │   │   └── ticket.py                 # Ticket request/response models
 │   ├── services/
+│   │   ├── dialog_flow_handler.py    # Smart conversation manager
+│   │   ├── smart_dialog_flow.py      # Ultra-smart dialog engine
+│   │   ├── session_manager.py        # Multi-turn session persistence
+│   │   ├── solution_searcher.py      # KB semantic search
 │   │   ├── osticket_service.py       # osTicket API client (async)
 │   │   ├── whatsapp_service.py       # WhatsApp API client (async)
-│   │   └── conversation_manager.py   # Multi-turn conversation manager
+│   │   └── conversation_manager.py   # Legacy conversation manager
 │   └── utils/
-│       ├── ai_logic.py               # AI intent detection (Gemini)
+│       ├── ai_logic.py               # AI engine (Ollama)
 │       └── kb_troubleshooting.py     # Knowledge base data
+├── dashboard/                         # React analytics dashboard
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       └── App.jsx
 └── README.md
 ```
 

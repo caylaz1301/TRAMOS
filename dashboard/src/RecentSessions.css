@@ -1,0 +1,149 @@
+.recent-sessions-container {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.recent-sessions-container h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 20px 0;
+}
+
+.sessions-table-wrapper {
+  overflow-x: auto;
+}
+
+.sessions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sessions-table thead {
+  background-color: #f3f4f6;
+}
+
+.sessions-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sessions-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #6b7280;
+}
+
+.sessions-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.sessions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.time {
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 120px;
+}
+
+.phone {
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 130px;
+}
+
+.name {
+  font-weight: 500;
+  color: #1f2937;
+  min-width: 130px;
+}
+
+.problem {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category {
+  min-width: 100px;
+}
+
+.severity {
+  min-width: 100px;
+}
+
+.severity-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #f0f9ff;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.state {
+  min-width: 120px;
+}
+
+.state-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 16px;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.messages {
+  text-align: center;
+  min-width: 70px;
+  font-weight: 500;
+}
+
+.ticket-id {
+  min-width: 100px;
+}
+
+.ticket-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #eff6ff;
+  color: #0369a1;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.no-ticket {
+  color: #d1d5db;
+}
+
+.no-sessions {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 16px !important;
+}
+
+@media (max-width: 1024px) {
+  .sessions-table {
+    font-size: 12px;
+  }
+
+  .sessions-table th,
+  .sessions-table td {
+    padding: 10px 12px;
+  }
+
+  .problem {
+    max-width: 100px;
+  }
+}

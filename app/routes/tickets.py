@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 from app.schemas.ticket import CreateTicketRequest, CreateTicketResponse
 from app.services.osticket_service import osticket_service
-from app.services.whatsapp_service import whatsapp_service
+from app.services.chatbot.whatsapp_service import whatsapp_service
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,6 @@ async def create_ticket(ticket_data: CreateTicketRequest) -> CreateTicketRespons
         )
     
     logger.info(f"Creating ticket for {ticket_data.email}: {ticket_data.subject}")
-    logger.debug(f"Ticket data: {ticket_data.model_dump()}")
     
     # Use async version
     result = await osticket_service.create_ticket(ticket_data)
