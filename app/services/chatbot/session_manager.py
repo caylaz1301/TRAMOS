@@ -130,6 +130,7 @@ class SessionManager:
         
         # Save to database
         if self.db_session:
+            db = None
             try:
                 db = self.db_session()
                 expires_at = datetime.now() + timedelta(seconds=SESSION_TIMEOUT)
@@ -143,9 +144,11 @@ class SessionManager:
                 )
                 db.add(db_session)
                 db.commit()
-                db.close()
             except Exception as e:
                 logger.error(f"❌ Error creating session in DB: {e}")
+            finally:
+                if db:
+                    db.close()
         
         # Cache in memory
         self.sessions[phone_number] = session
@@ -169,6 +172,7 @@ class SessionManager:
         
         # Try to load from database
         if self.db_session:
+            db = None
             try:
                 db = self.db_session()
                 db_session = db.query(WhatsAppSession).filter(
@@ -177,15 +181,14 @@ class SessionManager:
                 ).order_by(WhatsAppSession.created_at.desc()).first()
                 
                 if db_session and not self._is_db_session_expired(db_session):
-                    # Reconstruct ConversationSession from DB
                     session = self._restore_session_from_db(db_session)
                     self.sessions[phone_number] = session
-                    db.close()
                     return session
-                
-                db.close()
             except Exception as e:
                 logger.error(f"❌ Error loading session from DB: {e}")
+            finally:
+                if db:
+                    db.close()
         
         return None
     
@@ -205,6 +208,7 @@ class SessionManager:
         
         # Mark as inactive in DB
         if self.db_session:
+            db = None
             try:
                 db = self.db_session()
                 db_session = db.query(WhatsAppSession).filter_by(
@@ -214,9 +218,11 @@ class SessionManager:
                     db_session.is_active = False
                     db_session.closed_at = datetime.now()
                     db.commit()
-                db.close()
             except Exception as e:
                 logger.error(f"❌ Error closing session in DB: {e}")
+            finally:
+                if db:
+                    db.close()
         
         if session:
             logger.info(f"❌ Session closed: {session.session_id}")
@@ -228,6 +234,7 @@ class SessionManager:
         if not self.db_session:
             return
         
+        db = None
         try:
             db = self.db_session()
             db_session = db.query(WhatsAppSession).filter_by(
@@ -235,7 +242,6 @@ class SessionManager:
             ).first()
             
             if db_session:
-                # Update existing
                 db_session.current_state = session.current_state.value
                 db_session.driver_name = session.driver_name
                 db_session.problem_description = session.problem_description
@@ -248,8 +254,7 @@ class SessionManager:
                 db_session.conversation_history = session.conversation_history
                 db_session.ticket_created = session.ticket_created
                 db_session.ticket_id = session.ticket_id
-                # Save osticket_id if available
-                if hasattr(session, 'ticket_id') and session.ticket_id:
+                if session.ticket_id:
                     try:
                         db_session.osticket_id = int(session.ticket_id)
                     except (ValueError, TypeError):
@@ -258,10 +263,11 @@ class SessionManager:
                 db_session.expires_at = datetime.now() + timedelta(seconds=SESSION_TIMEOUT)
                 
                 db.commit()
-            
-            db.close()
         except Exception as e:
             logger.error(f"❌ Error saving session to DB: {e}")
+        finally:
+            if db:
+                db.close()
     
     def _update_session_in_db(self, session: ConversationSession):
         """Update only activity timestamp in DB"""

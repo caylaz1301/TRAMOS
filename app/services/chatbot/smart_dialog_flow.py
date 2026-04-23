@@ -696,12 +696,3 @@ class SmartDialogFlowHandler:
         )
         return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
 
-
-# Keep old class for backward compatibility
-class DialogFlowHandler(SmartDialogFlowHandler):
-    """Backward compatible alias"""
-    
-    @staticmethod
-    def get_next_prompt(session: ConversationSession, user_message: str = None) -> Tuple[str, DialogState]:
-        """Call new smart handler"""
-        return SmartDialogFlowHandler.get_smart_response(session, user_message)

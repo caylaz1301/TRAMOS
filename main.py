@@ -149,7 +149,6 @@ async def root():
 @app.get("/health", tags=["system"])
 async def health_check():
     """Enhanced health check endpoint for monitoring - checks all system components"""
-    import httpx
     from app.utils.ai_logic import ai_engine
     
     health_status = {
@@ -166,7 +165,6 @@ async def health_check():
         if not db_manager:
             db_status = "not_configured"
         else:
-            # Try to get a session to verify connectivity
             session = db_manager.get_session()
             session.close()
     except Exception as e:
@@ -177,13 +175,8 @@ async def health_check():
     ai_status = "unknown"
     try:
         if ai_engine:
-            # Check if ollama is reachable
-            try:
-                result = ai_engine.analyze_user_input("test")
-                ai_status = "operational" if result else "degraded"
-            except:
-                ai_status = "unreachable"
-    except:
+            ai_status = "operational" if ai_engine._check_ollama_connection() else "unreachable"
+    except Exception:
         ai_status = "not_configured"
     health_status["components"]["ai_engine"] = ai_status
     

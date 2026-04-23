@@ -172,120 +172,63 @@ class SmartResponseSystem:
     
     def generate_troubleshooting_steps(self, problem_category: str, severity: str) -> str:
         """
-        Generate contextual troubleshooting steps - natural and conversational
+        Generate contextual troubleshooting steps from KB content.
+        Falls back to generic steps only if KB has no content for category.
         """
+        from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
         
-        response = "Ini langkah-langkahnya:\n\n"
-        
-        steps = []
         category_lower = problem_category.lower()
+        kb_data = KB_TROUBLESHOOTING.get(category_lower)
         
-        if category_lower in ["gps", "tracking"]:
-            steps = [
-                ("Cek kondisi lokasi", [
-                    "Sudah outdoor? Kalau masih dalam gedung, sinyal gak bakal dapat",
-                    "Lihat ke langit, pastikan tidak ada penghalang",
-                    "Beri waktu 2-3 menit untuk akuisisi sinyal"
-                ]),
-                ("Restart device tracking", [
-                    "Matikan full sepenuhnya, tunggu 30 detik",
-                    "Nyalakan ulang, tunggu sampai full boot",
-                    "Cek apakah sinyal sudah kembali"
-                ]),
-                ("Verifikasi koneksi internet", [
-                    "Pastikan internet device aktif",
-                    "Coba reset lokasi di app settings",
-                    "Kalau masih bermasalah, lanjut ke support"
-                ])
-            ]
+        # If KB has full troubleshooting content, use it
+        if kb_data and kb_data.get("troubleshooting_steps"):
+            kb_steps = kb_data["troubleshooting_steps"]
+            response = "Ini langkah-langkahnya:\n\n"
+            
+            for step_data in kb_steps:
+                step_num = step_data.get("step", 0)
+                title = step_data.get("title", "")
+                instruction = step_data.get("instruction", "")
+                verification = step_data.get("verification", "")
+                
+                response += f"{step_num}. {title}:\n"
+                # Split instruction into bullet points for readability
+                sentences = [s.strip() for s in instruction.split('.') if s.strip()]
+                for sentence in sentences[:3]:  # Max 3 sub-points per step
+                    response += f"   • {sentence}\n"
+                if verification:
+                    response += f"   ✓ Cek: {verification}\n"
+                response += "\n"
+            
+            return response.strip()
         
-        elif category_lower in ["camera", "video"]:
-            steps = [
-                ("Pemeriksaan fisik", [
-                    "Lensa bersih? Cek apakah ada debu/noda",
-                    "Kabel power tersambung dengan baik?",
-                    "Storage device masih banyak?"
-                ]),
-                ("Power cycle kamera", [
-                    "Lepas power selama 1-2 menit",
-                    "Pasang kembali dengan hati-hati",
-                    "Tunggu sampai fully boot sebelum test"
-                ]),
-                ("Test recording", [
-                    "Coba record video pendek sekitar 30 detik",
-                    "Lihat kualitas video normal atau masih error?",
-                    "Kalau OK, masalah sudah solved"
-                ])
-            ]
+        # Fallback: generic steps
+        response = "Ini langkah-langkahnya:\n\n"
+        fallback_steps = [
+            ("Restart perangkat", [
+                "Matikan sepenuhnya, tunggu 1 menit",
+                "Nyalakan kembali dengan normal",
+                "Tunggu sampai fully booted sebelum test"
+            ]),
+            ("Cek kondisi dasar", [
+                "Koneksi internet masih OK?",
+                "Battery masih cukup?",
+                "Storage tidak penuh?"
+            ]),
+            ("Test fungsi bermasalah", [
+                "Coba feature yang tadinya error",
+                "Dokumentasikan apa yang terjadi",
+                "Apakah masalah masih konsisten?"
+            ])
+        ]
         
-        elif category_lower in ["battery", "power"]:
-            steps = [
-                ("Cek status baterai", [
-                    "Lihat persentase battery sekarang berapa?",
-                    "Baterai bisa di-charge atau emang tidak bisa charge?",
-                    "Charger yang digunakan original atau compatible?"
-                ]),
-                ("Reset baterai", [
-                    "Lepas baterai selama 2 menit (kalau bisa di-remove)",
-                    "Pasang kembali dengan benar",
-                    "Coba charge full dari 0%"
-                ]),
-                ("Verifikasi fungsi", [
-                    "Nyalakan device dan lihat apakah baterai meningkat saat charging",
-                    "Gunakan device normal dan lihat durasi battery",
-                    "Kalau masih cepat habis, mungkin perlu ganti unit"
-                ])
-            ]
-        
-        elif category_lower in ["connectivity", "network"]:
-            steps = [
-                ("Cek kualitas sinyal", [
-                    "Berapa bar sinyal sekarang? Minimal 2 bar untuk data",
-                    "WiFi atau mobile data yang error?",
-                    "Signal stabil atau sering putus-putus?"
-                ]),
-                ("Restart koneksi", [
-                    "Matikan WiFi/data selama 10 detik",
-                    "Nyalakan kembali dan tunggu reconnect",
-                    "Lihat apakah sinyal sudah stabil"
-                ]),
-                ("Uji coba koneksi", [
-                    "Coba buka app untuk test koneksi",
-                    "Lihat apakah data flowing normal",
-                    "Kalau stabil, masalah solved"
-                ])
-            ]
-        
-        else:
-            # Generic
-            steps = [
-                ("Restart perangkat", [
-                    "Matikan sepenuhnya, tunggu 1 menit",
-                    "Nyalakan kembali dengan normal",
-                    "Tunggu sampai fully booted sebelum test"
-                ]),
-                ("Cek kondisi dasar", [
-                    "Koneksi internet masih OK?",
-                    "Battery masih cukup?",
-                    "Storage tidak penuh?"
-                ]),
-                ("Test fungsi bermasalah", [
-                    "Coba feature yang tadinya error",
-                    "Dokumentasikan apa yang terjadi",
-                    "Apakah masalah masih konsisten atau sudah hilang?"
-                ])
-            ]
-        
-        # Format steps cleaner dan lebih natural
-        for i, (step_title, instructions) in enumerate(steps, 1):
+        for i, (step_title, instructions) in enumerate(fallback_steps, 1):
             response += f"{i}. {step_title}:\n"
             for instruction in instructions:
                 response += f"   • {instruction}\n"
             response += "\n"
         
-        response = response.strip()
-        
-        return response
+        return response.strip()
     
     # ========== EMPATHETIC OPENING ==========
     

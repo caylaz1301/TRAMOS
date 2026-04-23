@@ -80,19 +80,14 @@ class AITroubleshootingEngine:
             logger.debug(f"Ollama connection check failed: {e}")
             return False
     
-    # Knowledge base for common issues (fallback when LLM unavailable)
-    # Knowledge base categories (for reference only - no hardcoded responses)
-    # Actual responses are generated dynamically using AI
-    KB_CATEGORIES = ["GPS", "Camera", "Battery", "Connectivity", "Billing", "Maintenance", "Service"]
-    KB_KEYWORDS = {
-        "GPS": ["gps", "location", "tracking", "signal", "lokasi", "sinyal"],
-        "Camera": ["camera", "video", "recording", "feed", "kamera", "rekam"],
-        "Connectivity": ["connection", "internet", "network", "offline", "connected", "koneksi"],
-        "Battery": ["battery", "power", "charge", "low", "drain", "baterai", "listrik"],
-        "Billing": ["invoice", "payment", "billing", "tagihan", "pembayaran"],
-        "Maintenance": ["service", "maintenance", "inspection", "maintenance", "servis"],
-        "Service": ["support", "help", "assist", "problem", "bantuan", "masalah"]
-    }
+    # Knowledge base categories derived from KB_TROUBLESHOOTING (single source of truth)
+    @property
+    def KB_CATEGORIES(self):
+        return list(KB_TROUBLESHOOTING.keys())
+    
+    @property
+    def KB_KEYWORDS(self):
+        return {cat: data.get("keywords", []) for cat, data in KB_TROUBLESHOOTING.items()}
     
     def _detect_intent_with_ollama(self, message: str, context: Optional[str] = None) -> Tuple[str, Optional[str], Dict[str, Any]]:
         """Use Ollama/Mistral to detect intent - ENHANCED & ROBUST VERSION"""

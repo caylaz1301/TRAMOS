@@ -10,6 +10,10 @@ export default function Login({ onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!username.trim() || !password.trim()) {
+      setError('Masukkan username dan password');
+      return;
+    }
     setError('');
     setLoading(true);
 
@@ -19,7 +23,14 @@ export default function Login({ onLoginSuccess }) {
       localStorage.setItem('username', username);
       onLoginSuccess(response.access_token);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      const detail = err.response?.data?.detail;
+      if (detail) {
+        setError('Username atau password salah');
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('Tidak dapat terhubung ke server. Pastikan backend sudah berjalan.');
+      } else {
+        setError('Terjadi kesalahan. Silakan coba lagi.');
+      }
     } finally {
       setLoading(false);
     }
@@ -27,69 +38,76 @@ export default function Login({ onLoginSuccess }) {
 
   return (
     <div className="login-page">
-      {/* Background decoration */}
       <div className="login-bg">
-        <div className="bg-orb bg-orb-1" />
-        <div className="bg-orb bg-orb-2" />
-        <div className="bg-orb bg-orb-3" />
+        <div className="bg-gradient bg-gradient-1" />
+        <div className="bg-gradient bg-gradient-2" />
       </div>
 
-      <div className="login-card">
-        <div className="login-header">
-          <div className="login-icon">🚛</div>
-          <h1>TRAMOS</h1>
-          <p>AI Support Dashboard</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="login-form">
-          <div className="form-group">
-            <label htmlFor="login-username">Username</label>
-            <input
-              id="login-username"
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              required
-              disabled={loading}
-              autoComplete="username"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              disabled={loading}
-              autoComplete="current-password"
-            />
-          </div>
-
-          {error && (
-            <div className="login-error">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-              {error}
+      <div className="login-container">
+        <div className="login-card">
+          <div className="login-header">
+            <div className="login-logo">
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                <rect width="44" height="44" rx="12" fill="url(#login-grad)" />
+                <path d="M13 28V19l9-6 9 6v9l-9 6-9-6z" fill="white" fillOpacity="0.9" />
+                <path d="M22 13v15M13 19l9 9 9-9" stroke="white" strokeWidth="1.5" strokeOpacity="0.4" />
+                <defs>
+                  <linearGradient id="login-grad" x1="0" y1="0" x2="44" y2="44">
+                    <stop stopColor="#3b82f6" />
+                    <stop offset="1" stopColor="#8b5cf6" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
-          )}
+            <h1>TRAMOS</h1>
+            <p>Masuk ke Dashboard</p>
+          </div>
 
-          <button type="submit" disabled={loading} className="login-btn">
-            {loading ? (
-              <><span className="spinner spinner-sm" /> Signing in...</>
-            ) : (
-              'Sign In'
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="form-group">
+              <label htmlFor="login-username">Username</label>
+              <input
+                id="login-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Masukkan username"
+                required
+                disabled={loading}
+                autoComplete="username"
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="login-password">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Masukkan password"
+                required
+                disabled={loading}
+                autoComplete="current-password"
+              />
+            </div>
+
+            {error && (
+              <div className="login-error">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                {error}
+              </div>
             )}
-          </button>
-        </form>
 
-        <div className="login-footer">
-          <p className="login-hint">
-            Demo: <code>admin</code> / <code>admin123</code>
-          </p>
+            <button type="submit" disabled={loading} className="login-btn">
+              {loading ? (
+                <><span className="spinner spinner-sm" /> Memproses...</>
+              ) : (
+                'Masuk'
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>

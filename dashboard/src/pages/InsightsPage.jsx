@@ -1,31 +1,34 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsService } from '../api.js';
+import { analyticsService, benchmarkService } from '../api.js';
 import './InsightsPage.css';
 
 export default function InsightsPage() {
-  const [insights, setInsights] = useState(null);
-  const [trends, setTrends] = useState(null);
-  const [hotspots, setHotspots] = useState(null);
   const [alerts, setAlerts] = useState(null);
+  const [health, setHealth] = useState(null);
+  const [dashboard, setDashboard] = useState(null);
+  const [mlInsights, setMlInsights] = useState(null);
+  const [activityLog, setActivityLog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchData = async () => {
     try {
       setError(null);
-      const [insightsData, trendsData, hotspotsData, alertsData] = await Promise.all([
-        analyticsService.getInsights().catch(() => null),
-        analyticsService.getTrends().catch(() => null),
-        analyticsService.getHotspots().catch(() => null),
+      setLoading(true);
+      const [alertsData, healthData, dashData, mlData, logData] = await Promise.all([
         analyticsService.getActiveAlerts().catch(() => null),
+        analyticsService.getHealthCheck().catch(() => null),
+        analyticsService.getDashboard().catch(() => null),
+        analyticsService.getMLInsights().catch(() => null),
+        analyticsService.getActivityLog(15).catch(() => null),
       ]);
-      setInsights(insightsData);
-      setTrends(trendsData);
-      setHotspots(hotspotsData);
       setAlerts(alertsData);
+      setHealth(healthData);
+      setDashboard(dashData);
+      setMlInsights(mlData);
+      setActivityLog(logData);
     } catch (err) {
-      setError('Failed to load insights');
-      console.error(err);
+      setError('Gagal memuat data laporan');
     } finally {
       setLoading(false);
     }
@@ -33,238 +36,429 @@ export default function InsightsPage() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
   }, []);
 
-  if (loading && !insights) {
+  if (loading) {
     return (
       <div className="page-loading">
         <div className="spinner" />
-        <p>Generating insights...</p>
+        <p>Menyiapkan laporan...</p>
       </div>
     );
   }
 
-  const insightsData = insights || {};
-  const trendsData = trends || {};
-  const hotspotsData = hotspots || {};
   const alertsData = alerts || {};
   const activeAlerts = alertsData.alerts || [];
   const criticalCount = alertsData.critical_count || 0;
   const warningCount = alertsData.warning_count || 0;
 
+  const healthData = health || {};
+  const components = healthData.components || {};
+
+  const overview = dashboard?.overview || {};
+  const quality = dashboard?.quality || {};
+  const categories = dashboard?.categories?.categories || [];
+
+  const totalSessions = overview.total_sessions || 0;
+  const totalMessages = overview.total_messages || 0;
+  const completionRate = quality.completion_rate || 0;
+  const avgDuration = Math.round((quality.avg_duration_seconds || 0) / 60);
+  const avgMessages = overview.avg_messages_per_session || 0;
+
+  // ML data
+  const ml = mlInsights || {};
+  const weeklyTrend = ml.weekly_trend || {};
+  const kbEffectiveness = ml.kb_effectiveness || {};
+  const topEscalated = ml.top_escalated || [];
+  const peakHours = ml.peak_hours || [];
+  const recommendations = ml.recommendations || [];
+
+  // Activity log
+  const events = activityLog?.events || [];
+
+  // System health status
+  const systemStatus = criticalCount > 0 ? 'critical' : warningCount > 0 ? 'warning' : 'healthy';
+  const statusLabels = { critical: 'Ada Masalah Kritis', warning: 'Ada Peringatan', healthy: 'Semua Berjalan Normal' };
+  const statusIcons = { critical: '🔴', warning: '🟡', healthy: '🟢' };
+
+  // System components
+  const systemComponents = [
+    { name: 'Database', status: components.database || 'unknown', icon: '🗄️' },
+    { name: 'AI Engine (Ollama)', status: components.ai_engine || 'unknown', icon: '🤖' },
+    { name: 'WhatsApp API', status: components.whatsapp_api || 'unknown', icon: '💬' },
+    { name: 'osTicket', status: components.osticket || 'unknown', icon: '🎫' },
+    { name: 'Knowledge Base', status: components.knowledge_base || 'unknown', icon: '📚' },
+  ];
+
+  // Build insights from data
+  const insights = buildInsights(overview, quality, categories, kbEffectiveness);
+
   return (
     <div className="insights-page">
       <div className="page-header">
         <div>
-          <h1>Insights & Alerts</h1>
-          <p className="page-subtitle">AI-powered analysis, recommendations & system monitoring</p>
+          <h1>Laporan & Notifikasi</h1>
+          <p className="page-subtitle">Kesehatan sistem, analisis AI, dan rekomendasi operasional</p>
         </div>
+        <button className="btn-refresh" onClick={fetchData}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+          </svg>
+          Perbarui
+        </button>
       </div>
 
       {error && (
-        <div className="page-error">
-          ⚠️ {error}
-          <button onClick={fetchData}>Retry</button>
-        </div>
+        <div className="page-error">⚠️ {error}<button onClick={fetchData}>Coba Lagi</button></div>
       )}
 
-      {/* Alert Summary Strip */}
-      <div className="alert-strip">
-        <div className={`alert-status ${criticalCount > 0 ? 'status-critical' : warningCount > 0 ? 'status-warning' : 'status-healthy'}`}>
-          <span className="status-icon">
-            {criticalCount > 0 ? '🔴' : warningCount > 0 ? '🟡' : '🟢'}
-          </span>
-          <span className="status-text">
-            {criticalCount > 0 ? `${criticalCount} Critical Alert${criticalCount > 1 ? 's' : ''}` :
-             warningCount > 0 ? `${warningCount} Warning${warningCount > 1 ? 's' : ''}` :
-             'System Healthy'}
-          </span>
+      {/* System Status Strip */}
+      <div className={`status-strip status-${systemStatus}`}>
+        <div className="status-left">
+          <span className="status-icon">{statusIcons[systemStatus]}</span>
+          <div>
+            <div className="status-title">{statusLabels[systemStatus]}</div>
+            <div className="status-sub">{activeAlerts.length > 0 ? `${activeAlerts.length} notifikasi aktif` : 'Tidak ada notifikasi'}</div>
+          </div>
         </div>
-        <div className="alert-count">
-          {activeAlerts.length} total alert{activeAlerts.length !== 1 ? 's' : ''}
+        <div className="status-right">
+          <span className="status-time">Terakhir dicek: {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       </div>
 
-      {/* Content Grid */}
+      {/* Main Grid */}
       <div className="insights-grid">
-        {/* Left: Alerts + Hotspots */}
-        <div className="insights-left">
-          {/* Active Alerts */}
+        {/* Left Column */}
+        <div className="insights-col">
+          {/* System Health */}
           <div className="card">
             <div className="card-header">
-              <h2>⚡ Active Alerts</h2>
+              <h2>Status Sistem</h2>
+            </div>
+            <div className="components-list">
+              {systemComponents.map((comp, i) => (
+                <div key={i} className="comp-row">
+                  <span className="comp-icon">{comp.icon}</span>
+                  <span className="comp-name">{comp.name}</span>
+                  <span className={`comp-status comp-${getCompStatusType(comp.status)}`}>
+                    {getCompStatusLabel(comp.status)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="card">
+            <div className="card-header">
+              <h2>Notifikasi</h2>
               <span className="card-badge">{activeAlerts.length}</span>
             </div>
-            <div className="alerts-list">
+            <div className="alerts-content">
               {activeAlerts.length > 0 ? (
-                activeAlerts.slice(0, 6).map((alert, i) => (
+                activeAlerts.slice(0, 5).map((alert, i) => (
                   <div key={i} className={`alert-row alert-${alert.severity || 'info'}`}>
-                    <div className="alert-indicator" />
+                    <div className={`alert-dot dot-${alert.severity || 'info'}`} />
                     <div className="alert-body">
-                      <div className="alert-title">{alert.title || alert.message || 'Alert'}</div>
-                      <div className="alert-detail">{alert.description || alert.detail || ''}</div>
+                      <div className="alert-title">{alert.title || alert.message || 'Notifikasi'}</div>
+                      <div className="alert-desc">{alert.description || alert.detail || ''}</div>
                     </div>
-                    <span className={`alert-badge badge-${alert.severity || 'info'}`}>
-                      {alert.severity || 'info'}
-                    </span>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">
-                  <span className="empty-icon">✅</span>
-                  <p>No active alerts — system running smoothly</p>
+                <div className="alerts-empty">
+                  <div className="empty-icon-wrap">✓</div>
+                  <p className="empty-title">Tidak Ada Notifikasi</p>
+                  <p className="empty-desc">Semua komponen berjalan normal.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Hotspots */}
+          {/* AI Recommendations */}
           <div className="card">
             <div className="card-header">
-              <h2>🔥 Issue Hotspots</h2>
+              <h2>Rekomendasi AI</h2>
+              <span className="card-badge">{recommendations.length}</span>
             </div>
-            <div className="hotspots-list">
-              {hotspotsData.critical_hotspots && hotspotsData.critical_hotspots.length > 0 ? (
-                hotspotsData.critical_hotspots.map((hs, i) => (
-                  <div key={i} className="hotspot-row">
-                    <div className="hotspot-rank">{i + 1}</div>
-                    <div className="hotspot-body">
-                      <div className="hotspot-cat">{hs.category}</div>
-                      <div className="hotspot-meta">
-                        <span>Severity: <strong>{hs.severity}</strong></span>
-                        <span>Count: <strong>{hs.count}</strong></span>
-                      </div>
+            <div className="recommendations-content">
+              {recommendations.length > 0 ? (
+                recommendations.map((rec, i) => (
+                  <div key={i} className={`rec-row rec-${rec.priority}`}>
+                    <div className={`rec-priority priority-${rec.priority}`}>
+                      {rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}
                     </div>
-                    <span className="hotspot-trend">{hs.trend || '→'}</span>
+                    <div className="rec-body">
+                      <div className="rec-type">{getRecTypeLabel(rec.type)}</div>
+                      <div className="rec-message">{rec.message}</div>
+                    </div>
                   </div>
                 ))
               ) : (
-                <div className="empty-state">
-                  <span className="empty-icon">🎉</span>
-                  <p>No critical hotspots detected</p>
-                </div>
-              )}
-              {hotspotsData.recommendation && (
-                <div className="hotspot-rec">
-                  <span>💡</span> {hotspotsData.recommendation}
+                <div className="alerts-empty">
+                  <div className="empty-icon-wrap">👍</div>
+                  <p className="empty-title">Tidak Ada Rekomendasi</p>
+                  <p className="empty-desc">Sistem berjalan optimal. Akan ada rekomendasi jika terdeteksi area yang bisa ditingkatkan.</p>
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right: Insights + Trends */}
-        <div className="insights-right">
-          {/* AI Recommendations */}
+        {/* Right Column */}
+        <div className="insights-col">
+          {/* ML Analytics Summary */}
           <div className="card">
             <div className="card-header">
-              <h2>💡 AI Recommendations</h2>
+              <h2>Analisis Mingguan</h2>
             </div>
-            <div className="recs-container">
-              {/* Key Findings */}
-              {insightsData.insights && insightsData.insights.length > 0 && (
-                <div className="rec-group">
-                  <h3 className="rec-group-title">Key Findings</h3>
-                  {insightsData.insights.slice(0, 4).map((ins, i) => (
-                    <div key={i} className="rec-item rec-finding">
-                      <span className={`rec-severity sev-${ins.severity || 'info'}`}>
-                        {ins.severity === 'critical' ? '🔴' : ins.severity === 'warning' ? '🟡' : 'ℹ️'}
-                      </span>
-                      <div className="rec-content">
-                        <div className="rec-cat">{ins.category}</div>
-                        <div className="rec-detail">{ins.detail}</div>
-                      </div>
-                    </div>
-                  ))}
+            <div className="ml-summary">
+              <div className="ml-stat">
+                <div className="ml-stat-header">
+                  <span className="ml-stat-label">Tren Volume</span>
+                  <span className={`ml-trend trend-${weeklyTrend.direction || 'stable'}`}>
+                    {weeklyTrend.direction === 'up' ? '↑' : weeklyTrend.direction === 'down' ? '↓' : '→'} {Math.abs(weeklyTrend.change_percent || 0)}%
+                  </span>
                 </div>
-              )}
-
-              {/* Warnings */}
-              {insightsData.warnings && insightsData.warnings.length > 0 && (
-                <div className="rec-group">
-                  <h3 className="rec-group-title">⚠️ Warnings</h3>
-                  {insightsData.warnings.slice(0, 3).map((w, i) => (
-                    <div key={i} className="rec-item rec-warn">
-                      <span className="rec-severity sev-warning">🟡</span>
-                      <div className="rec-content">
-                        <div className="rec-cat">{w.category}</div>
-                        <div className="rec-detail">{w.detail}</div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="ml-stat-detail">
+                  Minggu ini: {weeklyTrend.this_week || 0} sesi • Minggu lalu: {weeklyTrend.last_week || 0} sesi
                 </div>
-              )}
-
-              {/* Action Recommendations */}
-              {insightsData.recommendations && insightsData.recommendations.length > 0 && (
-                <div className="rec-group">
-                  <h3 className="rec-group-title">✨ Suggested Actions</h3>
-                  {insightsData.recommendations.slice(0, 5).map((rec, i) => (
-                    <div key={i} className="rec-action">
-                      <span className="rec-arrow">→</span>
-                      <p>{rec}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {(!insightsData.insights?.length && !insightsData.warnings?.length && !insightsData.recommendations?.length) && (
-                <div className="empty-state">
-                  <span className="empty-icon">📊</span>
-                  <p>Collect more data to generate AI insights</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Trend Analysis */}
-          <div className="card">
-            <div className="card-header">
-              <h2>📈 Trend Analysis</h2>
-            </div>
-            <div className="trend-container">
-              <div className="trend-direction-box">
-                <div className="trend-arrow">
-                  {trendsData.trend_direction || '➡️'}
-                </div>
-                <div className="trend-label">Overall Direction</div>
               </div>
-              {trendsData.recommendation && (
-                <div className="trend-rec">
-                  {trendsData.recommendation}
+              <div className="ml-stat">
+                <div className="ml-stat-header">
+                  <span className="ml-stat-label">Efektivitas AI</span>
+                  <span className="ml-stat-value">{kbEffectiveness.ai_resolution_rate || 0}%</span>
                 </div>
-              )}
-              {trendsData.weekly_trends && trendsData.weekly_trends.length > 0 && (
-                <div className="trend-weeks">
-                  <h4>Weekly Summary</h4>
-                  <div className="week-bars">
-                    {trendsData.weekly_trends.slice(-4).map((w, i) => (
-                      <div key={i} className="week-item">
-                        <div className="week-bar-track">
-                          <div
-                            className="week-bar-fill"
-                            style={{ height: `${Math.min(w.resolution_rate || 0, 100)}%` }}
-                          />
-                        </div>
-                        <div className="week-label">{w.week || `W${i + 1}`}</div>
-                        <div className="week-val">{w.resolution_rate || 0}%</div>
+                <div className="ml-stat-detail">
+                  Diselesaikan AI: {kbEffectiveness.resolved_by_ai || 0} • Dieskalasi: {kbEffectiveness.escalated || 0}
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${kbEffectiveness.ai_resolution_rate || 0}%` }} />
+                </div>
+              </div>
+              {topEscalated.length > 0 && (
+                <div className="ml-stat">
+                  <div className="ml-stat-header">
+                    <span className="ml-stat-label">Kategori Sering Dieskalasi</span>
+                  </div>
+                  <div className="escalation-list">
+                    {topEscalated.slice(0, 3).map((cat, i) => (
+                      <div key={i} className="escalation-item">
+                        <span className="escalation-rank">#{i + 1}</span>
+                        <span className="escalation-name">{cat.category}</span>
+                        <span className="escalation-count">{cat.count}x</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-              {!trendsData.trend_direction && !trendsData.weekly_trends?.length && (
-                <div className="empty-state">
-                  <span className="empty-icon">📈</span>
-                  <p>Not enough data for trend analysis</p>
+              {peakHours.length > 0 && (
+                <div className="ml-stat">
+                  <div className="ml-stat-header">
+                    <span className="ml-stat-label">Jam Sibuk</span>
+                  </div>
+                  <div className="peak-hours">
+                    {peakHours.slice(0, 4).map((ph, i) => (
+                      <div key={i} className="peak-hour-badge">
+                        {String(ph.hour).padStart(2, '0')}:00 <span>({ph.count})</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Data Insights */}
+          <div className="card">
+            <div className="card-header">
+              <h2>Rangkuman Data</h2>
+            </div>
+            <div className="insights-content">
+              {insights.length > 0 ? (
+                insights.map((ins, i) => (
+                  <div key={i} className={`insight-row insight-${ins.type}`}>
+                    <div className={`insight-icon-wrap icon-${ins.type}`}>{ins.icon}</div>
+                    <div className="insight-body">
+                      <div className="insight-title">{ins.title}</div>
+                      <div className="insight-desc">{ins.desc}</div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-data">
+                  <span className="no-data-icon">📊</span>
+                  Belum ada cukup data untuk membuat rangkuman
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Activity Log */}
+          <div className="card">
+            <div className="card-header">
+              <h2>Log Aktivitas</h2>
+              <span className="card-badge">{events.length}</span>
+            </div>
+            <div className="activity-log">
+              {events.length > 0 ? (
+                events.slice(0, 10).map((evt, i) => (
+                  <div key={i} className={`activity-row activity-${evt.type}`}>
+                    <span className="activity-icon">{evt.icon}</span>
+                    <div className="activity-body">
+                      <div className="activity-desc">{evt.description}</div>
+                      <div className="activity-time">
+                        {evt.timestamp ? formatTimeAgo(evt.timestamp) : '-'}
+                        {evt.severity && <span className={`activity-severity sev-${evt.severity}`}>{evt.severity}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="alerts-empty">
+                  <div className="empty-icon-wrap">📝</div>
+                  <p className="empty-title">Belum Ada Aktivitas</p>
+                  <p className="empty-desc">Log akan terisi otomatis saat ada percakapan dan tiket baru.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="card">
+            <div className="card-header">
+              <h2>Statistik Cepat</h2>
+            </div>
+            <div className="quick-stats">
+              <div className="qstat">
+                <div className="qstat-val">{totalSessions}</div>
+                <div className="qstat-label">Total Percakapan</div>
+              </div>
+              <div className="qstat">
+                <div className="qstat-val">{totalMessages.toLocaleString('id-ID')}</div>
+                <div className="qstat-label">Total Pesan</div>
+              </div>
+              <div className="qstat">
+                <div className="qstat-val">{categories.length}</div>
+                <div className="qstat-label">Kategori Masalah</div>
+              </div>
+              <div className="qstat">
+                <div className="qstat-val">{Math.round(avgMessages)}</div>
+                <div className="qstat-label">Pesan/Sesi</div>
+              </div>
+              <div className="qstat">
+                <div className="qstat-val">{avgDuration > 60 ? `${Math.round(avgDuration/60)}j` : `${avgDuration}m`}</div>
+                <div className="qstat-label">Durasi Rata-rata</div>
+              </div>
+              <div className="qstat">
+                <div className="qstat-val">{`${completionRate}%`}</div>
+                <div className="qstat-label">Tingkat Selesai</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// ── Build insights from real data ──
+function buildInsights(overview, quality, categories, kbEffectiveness) {
+  const insights = [];
+  const totalSessions = overview.total_sessions || 0;
+  const totalTickets = overview.total_tickets || 0;
+  const completionRate = quality.completion_rate || 0;
+  const aiRate = kbEffectiveness.ai_resolution_rate || 0;
+
+  if (totalSessions > 0) {
+    const escalationRate = Math.round((totalTickets / totalSessions) * 100);
+    if (escalationRate > 60) {
+      insights.push({
+        type: 'warning', icon: '⚠️',
+        title: 'Tingkat Eskalasi Tinggi',
+        desc: `${escalationRate}% percakapan berakhir dengan tiket. Tambahkan solusi di Knowledge Base untuk mengurangi eskalasi.`,
+      });
+    } else if (escalationRate <= 30 && totalSessions >= 5) {
+      insights.push({
+        type: 'success', icon: '✅',
+        title: 'Chatbot Bekerja Efektif',
+        desc: `Hanya ${escalationRate}% percakapan diteruskan ke support. AI berhasil menangani mayoritas masalah.`,
+      });
+    }
+  }
+
+  if (completionRate > 0 && completionRate < 70) {
+    insights.push({
+      type: 'warning', icon: '📉',
+      title: 'Tingkat Penyelesaian Perlu Ditingkatkan',
+      desc: `Hanya ${completionRate}% sesi yang berhasil diselesaikan. Periksa alur percakapan chatbot.`,
+    });
+  }
+
+  if (categories.length > 0) {
+    const topCat = categories.reduce((a, b) => a.count > b.count ? a : b);
+    insights.push({
+      type: 'info', icon: '📋',
+      title: `Masalah Terbanyak: ${topCat.name}`,
+      desc: `Kategori "${topCat.name}" mendominasi dengan ${topCat.count} laporan. Fokuskan KB pada area ini.`,
+    });
+  }
+
+  if (totalSessions === 0) {
+    insights.push({
+      type: 'info', icon: '📊',
+      title: 'Mulai Mengumpulkan Data',
+      desc: 'Belum ada percakapan tercatat. Begitu ada pengguna menghubungi chatbot, data akan muncul otomatis.',
+    });
+  }
+
+  return insights;
+}
+
+// ── Helpers ──
+function getCompStatusType(status) {
+  if (!status || status === 'unknown') return 'unknown';
+  if (status === 'connected' || status === 'operational' || status === 'configured' || status.startsWith('loaded')) return 'ok';
+  if (status === 'not_configured') return 'off';
+  if (status.startsWith('error') || status === 'unreachable') return 'error';
+  return 'unknown';
+}
+
+function getCompStatusLabel(status) {
+  if (!status || status === 'unknown') return 'Tidak Diketahui';
+  if (status === 'connected') return 'Terhubung';
+  if (status === 'operational') return 'Aktif';
+  if (status === 'configured') return 'Dikonfigurasi';
+  if (status === 'not_configured') return 'Belum Dikonfigurasi';
+  if (status === 'unreachable') return 'Tidak Terjangkau';
+  if (status.startsWith('loaded')) return 'Aktif';
+  if (status.startsWith('error')) return 'Error';
+  return status;
+}
+
+function getRecTypeLabel(type) {
+  const labels = {
+    'kb_gap': 'Knowledge Base',
+    'staffing': 'Jadwal Tim',
+    'volume_alert': 'Volume',
+    'improvement': 'Peningkatan',
+    'kb_improvement': 'Knowledge Base',
+  };
+  return labels[type] || type;
+}
+
+function formatTimeAgo(timestamp) {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffMin < 1) return 'Baru saja';
+  if (diffMin < 60) return `${diffMin} menit lalu`;
+  if (diffHour < 24) return `${diffHour} jam lalu`;
+  if (diffDay < 7) return `${diffDay} hari lalu`;
+  return then.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }

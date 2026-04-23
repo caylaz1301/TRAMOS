@@ -1,13 +1,15 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api';
+// Use relative URL so Vite proxy handles routing to backend
+const API_URL = '/api';
 
 // Create axios instance with default config
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  timeout: 15000
 });
 
 // Add token to requests
@@ -21,6 +23,19 @@ api.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Auto-logout on 401 responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('username');
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
 );
 
 // Auth service
@@ -231,6 +246,26 @@ export const analyticsService = {
     const response = await api.get('/analytics/export/html', {
       params: { report_type: reportType }
     });
+    return response.data;
+  },
+
+  // ML Insights (new)
+  getMLInsights: async () => {
+    const response = await api.get('/analytics/ml-insights');
+    return response.data;
+  },
+
+  // Activity Log (new)
+  getActivityLog: async (limit = 20) => {
+    const response = await api.get('/analytics/activity-log', {
+      params: { limit }
+    });
+    return response.data;
+  },
+
+  // Timeline (new)
+  getTimeline: async () => {
+    const response = await api.get('/analytics/stats/timeline');
     return response.data;
   }
 };

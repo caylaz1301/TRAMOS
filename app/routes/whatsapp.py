@@ -513,9 +513,6 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
     try:
         # Prepare ticket data
         driver_name = session.driver_name or "Unknown Driver"
-        subject = f"[{session.problem_category}] Issue Report - {driver_name}"
-        
-        # Safely handle None values in message body
         problem_desc = session.problem_description or "Tidak ada deskripsi"
         equipment = session.vehicle_unit or "Tidak disebutkan"
         location = session.location or "Tidak disebutkan"
@@ -523,20 +520,49 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
         problem_cat = session.problem_category or "Service"
         severity = session.problem_severity or "medium"
         
-        # Clean ticket message - ONLY essential info, NOT conversation history
-        message_body = f"""
-Driver Information:
-- Name: {session.driver_name}
-- Phone: {phone_number}
-
-Issue Details:
-- Description: {problem_desc}
-- Category: {problem_cat}
-- Severity: {severity}
-- Equipment: {equipment}
-- Location: {location}
-- Time Reported: {issue_time}
-        """
+        # Build informative subject: [TRAMOS] SEVERITY - Category: Problem summary
+        severity_label = severity.upper()
+        problem_summary = problem_desc[:50].replace('\n', ' ')
+        subject = f"[TRAMOS] {severity_label} - {problem_cat}: {problem_summary}"
+        
+        # Build structured ticket body
+        # Section 1: Reporter info
+        body_parts = [
+            "📋 LAPORAN MASALAH TRAMOS",
+            "━" * 30,
+            "",
+            "👤 PELAPOR",
+            f"   Nama: {driver_name}",
+            f"   Telepon: {phone_number}",
+            "",
+            "🛠️ DETAIL MASALAH",
+            f"   Deskripsi: {problem_desc}",
+            f"   Kategori: {problem_cat}",
+            f"   Tingkat Urgensi: {severity_label}",
+            "",
+            "📍 INFORMASI LAPANGAN",
+            f"   Unit/Kendaraan: {equipment}",
+            f"   Lokasi: {location}",
+            f"   Waktu Kejadian: {issue_time}",
+            "",
+            "🤖 ANALISIS AI",
+            f"   Solusi KB: {'Dicoba - gagal' if session.tried_kb_solution else 'Tidak tersedia untuk kategori ini'}",
+            f"   Status: Dieskalasi ke tim support",
+            f"   Jumlah pesan: {session.message_count}",
+        ]
+        
+        # Section 2: Last conversation messages (max 5)
+        if session.conversation_history:
+            body_parts.append("")
+            body_parts.append("💬 RIWAYAT PERCAKAPAN (5 terakhir)")
+            body_parts.append("━" * 30)
+            recent_msgs = session.conversation_history[-5:]
+            for msg in recent_msgs:
+                sender = "User" if msg.get('sender') == 'user' else 'Bot'
+                text = msg.get('message', '')[:120]
+                body_parts.append(f"   [{sender}] {text}")
+        
+        message_body = "\n".join(body_parts)
         
         # Determine priority from severity
         priority_map = {
@@ -660,209 +686,4 @@ Issue Details:
         )
 
 
-def is_greeting(message: str) -> bool:
-    """Check if message is a greeting"""
-    greetings = [
-        "halo", "hi", "hello", "hey", "hai",
-        "pagi", "siang", "sore", "malam",
-        "apa kabar", "assalamu", "selamat"
-    ]
-    return any(g in message for g in greetings) and len(message.split()) <= 5
 
-
-def is_escalation_request(message: str) -> bool:
-    """Check if user wants to talk to human"""
-    keywords = [
-        "operator", "manusia", "human", "agent", "cs",
-        "customer service", "tolong bantu", "bicara dengan"
-    ]
-    return any(kw in message for kw in keywords)
-
-
-def is_ticket_request(message: str) -> bool:
-    """Check if user wants to create a ticket"""
-    keywords = ["tiket", "ticket", "buat laporan", "lapor masalah"]
-    return any(kw in message for kw in keywords)
-
-
-def is_status_check(message: str) -> bool:
-    """Check if user is asking for system status"""
-    keywords = ["status", "check", "test", "ping"]
-    return any(kw in message for kw in keywords) and len(message.split()) <= 3
-
-
-# ============================================================================
-# RESPONSE GENERATORS
-# ============================================================================
-
-def generate_greeting_response(user_name: str) -> str:
-    """Generate greeting response with menu"""
-    return (
-        f"Halo {user_name}! 👋\n\n"
-        f"Selamat datang di TRAMOS Support. Ada yang bisa kami bantu?\n\n"
-        f"Silakan ceritakan masalah Anda atau pilih kategori:\n"
-        f"• 🗺️ GPS/Tracking\n"
-        f"• 📡 Koneksi Internet\n"
-        f"• 🔧 Device/Hardware\n"
-        f"• 📱 Aplikasi\n"
-        f"• 📝 Buat Tiket Support"
-    )
-
-
-def generate_resolved_response(user_name: str) -> str:
-    """Generate response when issue is resolved"""
-    return (
-        f"Senang bisa membantu, {user_name}! 🎉\n\n"
-        f"Jika ada masalah lain, jangan ragu untuk menghubungi kami.\n\n"
-        f"Terima kasih telah menggunakan TRAMOS Support! 🙏"
-    )
-
-
-def generate_unresolved_response(user_name: str, category: Optional[str]) -> str:
-    """Generate response when solution didn't work"""
-    response = (
-        f"Maaf solusi sebelumnya tidak berhasil, {user_name}. 😔\n\n"
-    )
-    
-    if category:
-        response += (
-            f"Mari kita coba langkah lanjutan untuk masalah {category}:\n\n"
-            f"1. Restart perangkat sepenuhnya\n"
-            f"2. Periksa semua koneksi kabel\n"
-            f"3. Pastikan firmware sudah terupdate\n\n"
-        )
-    
-    response += (
-        f"Jika masih bermasalah, ketik 'tiket' untuk eskalasi ke tim support."
-    )
-    return response
-
-
-async def handle_escalation(
-    user_name: str, 
-    phone_number: str, 
-    message: str,
-    category: Optional[str]
-) -> str:
-    """Handle escalation to human support by creating ticket"""
-    subject = f"Eskalasi: {category or 'General'} - {user_name}"
-    
-    ticket_request = CreateTicketRequest(
-        name=user_name,
-        email=f"{phone_number}@whatsapp.tramos.id",
-        subject=subject,
-        message=f"Eskalasi dari WhatsApp:\n\nPesan terakhir: {message}\nKategori: {category or 'Tidak terdeteksi'}",
-        source="whatsapp",
-        ip="127.0.0.1"
-    )
-    
-    result = await osticket_service.create_ticket(ticket_request)
-    
-    if result.success:
-        return (
-            f"✅ Permintaan eskalasi berhasil, {user_name}!\n\n"
-            f"Nomor Tiket: #{result.ticket_id}\n\n"
-            f"Tim support kami akan segera menghubungi Anda.\n"
-            f"Terima kasih atas kesabarannya! 🙏"
-        )
-    else:
-        return (
-            f"Maaf {user_name}, gagal membuat tiket eskalasi.\n\n"
-            f"Silakan hubungi support langsung atau coba lagi nanti."
-        )
-
-
-async def handle_ticket_creation(
-    user_name: str,
-    phone_number: str, 
-    message: str
-) -> str:
-    """Create support ticket from WhatsApp"""
-    ticket_request = CreateTicketRequest(
-        name=user_name,
-        email=f"{phone_number}@whatsapp.tramos.id",
-        subject=f"WhatsApp Support: {user_name}",
-        message=f"Dari WhatsApp ({phone_number}):\n\n{message}",
-        source="whatsapp",
-        ip="127.0.0.1"
-    )
-    
-    result = await osticket_service.create_ticket(ticket_request)
-    
-    if result.success:
-        return (
-            f"✅ Tiket support berhasil dibuat!\n\n"
-            f"Nomor Tiket: #{result.ticket_id}\n\n"
-            f"Tim kami akan menghubungi Anda segera.\n"
-            f"Terima kasih, {user_name}! 🙏"
-        )
-    else:
-        logger.error(f"Failed to create ticket: {result.error}")
-        return "❌ Maaf, gagal membuat tiket. Silakan coba lagi."
-
-
-def generate_troubleshooting_response(category: str, user_name: str) -> str:
-    """Generate troubleshooting response based on AI-detected category"""
-    
-    # Map AI category to KB
-    category_map = {
-        "GPS": "gps",
-        "Camera": "camera",
-        "Battery": "battery",
-        "Connectivity": "connectivity",
-    }
-    
-    kb_key = category_map.get(category, category.lower())
-    kb_data = KB_TROUBLESHOOTING.get(kb_key)
-    
-    if kb_data:
-        return generate_kb_response(kb_data, user_name)
-    
-    # Generic troubleshooting
-    return (
-        f"Saya mendeteksi masalah {category}, {user_name}.\n\n"
-        f"Langkah umum:\n"
-        f"1. Restart perangkat\n"
-        f"2. Periksa koneksi dan kabel\n"
-        f"3. Pastikan power supply stabil\n\n"
-        f"Apakah langkah ini membantu? Balas 'sudah' atau 'masih error'."
-    )
-
-
-def generate_kb_response(kb_data: dict, user_name: str) -> str:
-    """Generate response from Knowledge Base"""
-    first_response = kb_data.get("first_response", "")
-    steps = kb_data.get("troubleshooting_steps", [])
-    
-    response = f"{first_response}\n\n"
-    
-    # Add troubleshooting steps
-    if steps:
-        response += "📋 *Langkah-langkah:*\n\n"
-        for step in steps[:2]:  # First 2 steps only
-            step_num = step.get("step", 1)
-            step_title = step.get("title", "")
-            instructions = step.get("instructions", [])
-            
-            response += f"*Step {step_num}: {step_title}*\n"
-            for instruction in instructions[:3]:  # Max 3 instructions per step
-                response += f"  • {instruction}\n"
-            response += "\n"
-    
-    response += "Setelah selesai, balas '*sudah*' atau '*masih error*' ✅"
-    
-    return response
-
-
-def generate_fallback_response(user_name: str) -> str:
-    """Generate fallback response when intent is unclear"""
-    return (
-        f"Maaf {user_name}, saya belum sepenuhnya paham. 🤔\n\n"
-        f"Bisa jelaskan lebih detail masalahnya?\n\n"
-        f"Atau pilih kategori:\n"
-        f"• 🗺️ GPS/Tracking\n"
-        f"• 📡 Koneksi/Internet\n"
-        f"• 🔧 Device/Hardware\n"
-        f"• 📱 Aplikasi\n"
-        f"• 📝 Buat Tiket"
-    )

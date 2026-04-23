@@ -21,17 +21,17 @@
   z-index: 50;
 }
 
+/* Brand */
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 24px 20px;
+  padding: 20px;
   border-bottom: 1px solid var(--border);
 }
 
-.brand-icon {
-  font-size: 28px;
-  line-height: 1;
+.brand-logo {
+  flex-shrink: 0;
 }
 
 .brand-text {
@@ -40,7 +40,7 @@
 }
 
 .brand-name {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: var(--text-primary);
@@ -49,18 +49,26 @@
 .brand-sub {
   font-size: 11px;
   font-weight: 500;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
 }
 
-/* ── Navigation ── */
+/* Navigation */
 .sidebar-nav {
   flex: 1;
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 4px 14px 10px;
 }
 
 .nav-item {
@@ -68,20 +76,20 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   text-align: left;
-  transition: all var(--transition-fast);
+  transition: all var(--t-fast);
   position: relative;
 }
 
 .nav-item:hover {
-  background: var(--bg-card-hover);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-primary);
 }
 
@@ -91,33 +99,38 @@
   font-weight: 600;
 }
 
+.nav-item.active .nav-icon svg {
+  stroke: var(--accent);
+}
+
 .nav-icon {
-  font-size: 18px;
-  line-height: 1;
-  width: 24px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.nav-icon svg {
+  stroke: var(--text-muted);
+  transition: stroke var(--t-fast);
+}
+
+.nav-item:hover .nav-icon svg {
+  stroke: var(--text-primary);
 }
 
 .nav-label {
   flex: 1;
 }
 
-.nav-indicator {
-  width: 3px;
-  height: 20px;
-  background: var(--accent);
-  border-radius: 2px;
-  position: absolute;
-  right: 4px;
-}
-
-/* ── Sidebar Footer ── */
+/* Footer */
 .sidebar-footer {
-  padding: 16px;
+  padding: 14px 16px;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .user-section {
@@ -129,16 +142,16 @@
 }
 
 .user-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #818cf8);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent), var(--violet));
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--text-inverse);
+  color: white;
   flex-shrink: 0;
 }
 
@@ -162,9 +175,9 @@
   color: var(--text-muted);
 }
 
-.sidebar-footer .btn-logout {
-  width: 34px;
-  height: 34px;
+.btn-logout {
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -172,46 +185,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  transition: all var(--t-fast);
   flex-shrink: 0;
 }
 
-.sidebar-footer .btn-logout:hover {
-  background: var(--danger-muted);
-  color: var(--danger);
+.btn-logout:hover {
+  background: var(--rose-muted);
+  color: var(--rose);
 }
 
-/* ── Main Content ── */
+/* Main Content */
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: 32px;
+  padding: 28px 32px;
   min-height: 100vh;
   overflow-y: auto;
+  background: var(--bg-primary);
 }
 
-/* ── Responsive ── */
+/* Responsive */
 @media (max-width: 768px) {
   .sidebar {
-    width: 64px;
+    width: var(--sidebar-collapsed);
   }
-  .brand-text, .nav-label, .nav-indicator, .user-details {
+  .brand-text, .nav-label, .nav-section-label, .user-details {
     display: none;
   }
   .sidebar-brand {
     justify-content: center;
-    padding: 20px 8px;
+    padding: 16px 8px;
   }
   .nav-item {
     justify-content: center;
-    padding: 12px 8px;
+    padding: 10px 8px;
   }
   .sidebar-footer {
     flex-direction: column;
-    padding: 12px 8px;
+    padding: 10px 8px;
   }
   .main-content {
-    margin-left: 64px;
+    margin-left: var(--sidebar-collapsed);
     padding: 20px 16px;
   }
 }

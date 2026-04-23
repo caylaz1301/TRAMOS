@@ -1,6 +1,9 @@
 """
 Adaptive Dialog Flow Engine - Intelligent conversation flow that adapts to context
 Instead of linear scripts, uses state machine with intelligent transitions
+
+Note: This uses its own DialogState enum (conceptual states) separate from
+session_manager.DialogState (actual chatbot states). They serve different purposes.
 """
 
 import logging
@@ -15,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class DialogState(str, Enum):
-    """Conversation states"""
+    """Conceptual conversation states for adaptive dialog flow"""
     GREETING = "greeting"
-    LISTENING = "listening"              # Collecting problem details
-    ANALYZING = "analyzing"              # Analyzing the problem
-    PROPOSING = "proposing"              # Proposing solution
-    TROUBLESHOOTING = "troubleshooting"  # Executing troubleshooting
-    VALIDATING = "validating"            # Checking if solution worked
-    ESCALATING = "escalating"            # Need human support
-    RESOLVED = "resolved"                # Problem solved
-    FEEDBACK = "feedback"                # Collecting feedback
+    LISTENING = "listening"
+    ANALYZING = "analyzing"
+    PROPOSING = "proposing"
+    TROUBLESHOOTING = "troubleshooting"
+    VALIDATING = "validating"
+    ESCALATING = "escalating"
+    RESOLVED = "resolved"
+    FEEDBACK = "feedback"
 
 
 class DialogTransition:

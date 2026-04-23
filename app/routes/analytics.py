@@ -829,3 +829,180 @@ async def get_overall_score(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting score: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ML INSIGHTS - Actionable analytics for dashboard
+# ============================================================================
+
+@router.get("/ml-insights")
+async def get_ml_insights(db: Session = Depends(get_db)):
+    """Get ML-driven insights: top escalations, peak hours, weekly trend, KB rate"""
+    try:
+        now = datetime.now()
+        seven_days_ago = now - timedelta(days=7)
+        fourteen_days_ago = now - timedelta(days=14)
+        
+        # --- Top escalated categories ---
+        escalated_categories = db.query(
+            WhatsAppSession.problem_category,
+            func.count(WhatsAppSession.id).label("count")
+        ).filter(
+            WhatsAppSession.ticket_id.isnot(None),
+            WhatsAppSession.problem_category.isnot(None)
+        ).group_by(
+            WhatsAppSession.problem_category
+        ).order_by(func.count(WhatsAppSession.id).desc()).limit(5).all()
+        
+        top_escalated = [
+            {"category": cat or "Unknown", "count": cnt}
+            for cat, cnt in escalated_categories
+        ]
+        
+        # --- Peak hours analysis (last 7 days) ---
+        peak_hours_raw = db.query(
+            func.extract('hour', WhatsAppSession.created_at).label("hour"),
+            func.count(WhatsAppSession.id).label("count")
+        ).filter(
+            WhatsAppSession.created_at >= seven_days_ago
+        ).group_by(
+            func.extract('hour', WhatsAppSession.created_at)
+        ).order_by(func.count(WhatsAppSession.id).desc()).all()
+        
+        peak_hours = [
+            {"hour": int(hour), "count": cnt}
+            for hour, cnt in peak_hours_raw
+        ]
+        
+        # --- Weekly trend (this week vs last week) ---
+        this_week_count = db.query(func.count(WhatsAppSession.id)).filter(
+            WhatsAppSession.created_at >= seven_days_ago
+        ).scalar() or 0
+        
+        last_week_count = db.query(func.count(WhatsAppSession.id)).filter(
+            and_(
+                WhatsAppSession.created_at >= fourteen_days_ago,
+                WhatsAppSession.created_at < seven_days_ago
+            )
+        ).scalar() or 0
+        
+        if last_week_count > 0:
+            trend_pct = round(((this_week_count - last_week_count) / last_week_count) * 100, 1)
+        else:
+            trend_pct = 100.0 if this_week_count > 0 else 0.0
+        
+        # --- KB effectiveness ---
+        total_sessions = db.query(func.count(WhatsAppSession.id)).scalar() or 0
+        
+        tickets_created = db.query(func.count(WhatsAppSession.id)).filter(
+            WhatsAppSession.ticket_id.isnot(None)
+        ).scalar() or 0
+        
+        resolved_by_ai = total_sessions - tickets_created
+        kb_rate = round((resolved_by_ai / total_sessions * 100), 1) if total_sessions > 0 else 0
+        
+        # --- Generate recommendations ---
+        recommendations = []
+        
+        if top_escalated:
+            top_cat = top_escalated[0]["category"]
+            recommendations.append({
+                "type": "kb_gap",
+                "priority": "high",
+                "message": f"Kategori '{top_cat}' paling sering dieskalasi. Pertimbangkan untuk menambah solusi KB yang lebih detail.",
+            })
+        
+        if peak_hours:
+            peak_h = peak_hours[0]["hour"]
+            recommendations.append({
+                "type": "staffing",
+                "priority": "medium",
+                "message": f"Jam sibuk: {peak_h}:00. Pastikan tim support standby di jam-jam tersebut.",
+            })
+        
+        if trend_pct > 20:
+            recommendations.append({
+                "type": "volume_alert",
+                "priority": "high",
+                "message": f"Volume laporan naik {trend_pct}% dibanding minggu lalu. Perlu evaluasi.",
+            })
+        elif trend_pct < -10:
+            recommendations.append({
+                "type": "improvement",
+                "priority": "low",
+                "message": f"Volume laporan turun {abs(trend_pct)}%. Sistem semakin stabil.",
+            })
+        
+        if kb_rate < 50:
+            recommendations.append({
+                "type": "kb_improvement",
+                "priority": "high",
+                "message": f"Hanya {kb_rate}% masalah terselesaikan tanpa eskalasi. Knowledge base perlu diperkaya.",
+            })
+        
+        return {
+            "top_escalated": top_escalated,
+            "peak_hours": peak_hours,
+            "weekly_trend": {
+                "this_week": this_week_count,
+                "last_week": last_week_count,
+                "change_percent": trend_pct,
+                "direction": "up" if trend_pct > 0 else "down" if trend_pct < 0 else "stable"
+            },
+            "kb_effectiveness": {
+                "total_sessions": total_sessions,
+                "resolved_by_ai": resolved_by_ai,
+                "escalated": tickets_created,
+                "ai_resolution_rate": kb_rate
+            },
+            "recommendations": recommendations,
+            "generated_at": now.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting ML insights: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ACTIVITY LOG - Recent events timeline
+# ============================================================================
+
+@router.get("/activity-log")
+async def get_activity_log(limit: int = 20, db: Session = Depends(get_db)):
+    """Get recent activity events for dashboard timeline"""
+    try:
+        recent = db.query(WhatsAppSession).order_by(
+            WhatsAppSession.last_activity.desc()
+        ).limit(limit).all()
+        
+        events = []
+        for s in recent:
+            # Determine event type
+            if s.ticket_id:
+                event_type = "ticket_created"
+                event_icon = "🎫"
+                event_desc = f"Tiket #{s.ticket_id} dibuat untuk {s.driver_name or 'user'} ({s.problem_category or 'General'})"
+            elif s.current_state == "closed":
+                event_type = "session_resolved"
+                event_icon = "✅"
+                event_desc = f"Masalah {s.driver_name or 'user'} terselesaikan ({s.problem_category or 'N/A'})"
+            else:
+                event_type = "session_active"
+                event_icon = "💬"
+                event_desc = f"Sesi aktif dari {s.driver_name or s.phone_number} ({s.message_count} pesan)"
+            
+            events.append({
+                "type": event_type,
+                "icon": event_icon,
+                "description": event_desc,
+                "timestamp": s.last_activity.isoformat() if s.last_activity else s.created_at.isoformat() if s.created_at else None,
+                "phone": s.phone_number,
+                "category": s.problem_category,
+                "severity": s.problem_severity,
+            })
+        
+        return {"events": events}
+    except Exception as e:
+        logger.error(f"Error getting activity log: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
