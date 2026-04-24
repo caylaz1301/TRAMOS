@@ -16,6 +16,7 @@ Populates all database tables during conversation flow:
 """
 
 import logging
+from contextlib import contextmanager
 from datetime import datetime, date
 from typing import Optional, Dict, Any
 
@@ -55,6 +56,27 @@ class DatabaseTracker:
         if self.db_manager:
             return self.db_manager.get_session()
         return None
+
+
+    @contextmanager
+    def _safe_db(self):
+        """Context manager that guarantees session cleanup on any exit path.
+        Usage:
+            with self._safe_db() as db:
+                if db is None:
+                    return
+                # ... use db ...
+        """
+        db = self._get_db()
+        try:
+            yield db
+        except Exception:
+            if db:
+                db.rollback()
+            raise
+        finally:
+            if db:
+                db.close()
 
     # ========================================================================
     # USER MANAGEMENT

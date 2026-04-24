@@ -18,7 +18,7 @@ from app.utils.semantic_kb_matcher import SemanticKBMatcher
 from app.utils.user_profile_manager import UserProfileManager
 from app.utils.solution_effectiveness_tracker import SolutionEffectivenessTracker, SolutionOutcome
 from app.utils.smart_prompt_engineer import SmartPromptEngineer
-from app.utils.dialog_flow_engine import AdaptiveDialogFlowEngine, DialogState
+from app.utils.dialog_flow_engine import AdaptiveDialogFlowEngine, AdaptiveDialogState
 
 logger = logging.getLogger(__name__)
 
@@ -400,7 +400,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                 "semantic_match_score": match_score,
                 "kb_solutions": kb_solutions[:3],  # Top 3 alternatives
                 "skill_level": user_profile.skill_level.value if user_profile else "intermediate",
-                "frustration_level": user_profile.frustration_level if user_profile else 0.0,
+                "frustration_level": (min(1.0, (user_profile.frustration_indicators or 0) / 5.0) if user_profile else 0.0),
             }
             
             # ✨ NEW: Use smart prompt engineer to generate better troubleshooting prompt
@@ -458,7 +458,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                         solution_steps=result.get("steps", []),
                         kb_match_score=match_score,
                         user_skill_level=user_profile.skill_level.value if user_profile else "intermediate",
-                        user_frustration=user_profile.frustration_level if user_profile else 0.0,
+                        user_frustration=(min(1.0, (user_profile.frustration_indicators or 0) / 5.0) if user_profile else 0.0),
                         ai_confidence=result.get("ai_confidence", 0.5)
                     )
                 

@@ -17,8 +17,13 @@ from app.utils.semantic_kb_matcher import SemanticKBMatcher
 logger = logging.getLogger(__name__)
 
 
-class DialogState(str, Enum):
-    """Conceptual conversation states for adaptive dialog flow"""
+class AdaptiveDialogState(str, Enum):
+    """Conceptual conversation states for adaptive dialog flow
+    
+    NOTE: This is separate from session_manager.DialogState which drives
+    the actual chatbot state machine. This enum is used only by
+    AdaptiveDialogFlowEngine for conceptual flow analysis.
+    """
     GREETING = "greeting"
     LISTENING = "listening"
     ANALYZING = "analyzing"
@@ -35,8 +40,8 @@ class DialogTransition:
     
     def __init__(
         self,
-        from_state: DialogState,
-        to_state: DialogState,
+        from_state: AdaptiveDialogState,
+        to_state: AdaptiveDialogState,
         condition: callable,
         priority: int = 1
     ):
@@ -67,32 +72,32 @@ class AdaptiveDialogFlowEngine:
         
         # GREETING → LISTENING (after greeting, ready to hear problem)
         self.transitions.append(DialogTransition(
-            DialogState.GREETING,
-            DialogState.LISTENING,
+            AdaptiveDialogState.GREETING,
+            AdaptiveDialogState.LISTENING,
             lambda ctx: ctx.get('received_problem_indication', False),
             priority=10
         ))
         
         # GREETING → FEEDBACK (user doesn't have new problem)
         self.transitions.append(DialogTransition(
-            DialogState.GREETING,
-            DialogState.FEEDBACK,
+            AdaptiveDialogState.GREETING,
+            AdaptiveDialogState.FEEDBACK,
             lambda ctx: ctx.get('intent') == 'feedback' and ctx.get('total_issues', 0) > 0,
             priority=5
         ))
         
         # LISTENING → ANALYZING (collected enough details)
         self.transitions.append(DialogTransition(
-            DialogState.LISTENING,
-            DialogState.ANALYZING,
+            AdaptiveDialogState.LISTENING,
+            AdaptiveDialogState.ANALYZING,
             lambda ctx: self._is_problem_detailed_enough(ctx),
             priority=10
         ))
         
         # LISTENING → ESCALATING (user too frustrated, give up early)
         self.transitions.append(DialogTransition(
-            DialogState.LISTENING,
-            DialogState.ESCALATING,
+            AdaptiveDialogState.LISTENING,
+            AdaptiveDialogState.ESCALATING,
             lambda ctx: (
                 ctx.get('frustration_level', 0) > 0.8 and
                 ctx.get('time_available') == TimeAvailability.URGENT.value
@@ -102,16 +107,16 @@ class AdaptiveDialogFlowEngine:
         
         # ANALYZING → PROPOSING (understood the problem)
         self.transitions.append(DialogTransition(
-            DialogState.ANALYZING,
-            DialogState.PROPOSING,
+            AdaptiveDialogState.ANALYZING,
+            AdaptiveDialogState.PROPOSING,
             lambda ctx: ctx.get('solution_confidence', 0) >= 0.6,
             priority=10
         ))
         
         # ANALYZING → ESCALATING (don't understand, confidence too low)
         self.transitions.append(DialogTransition(
-            DialogState.ANALYZING,
-            DialogState.ESCALATING,
+            AdaptiveDialogState.ANALYZING,
+            AdaptiveDialogState.ESCALATING,
             lambda ctx: (
                 ctx.get('solution_confidence', 0) < 0.4 and
                 ctx.get('analysis_attempts', 0) >= 2
@@ -121,16 +126,16 @@ class AdaptiveDialogFlowEngine:
         
         # PROPOSING → TROUBLESHOOTING (user accepts solution)
         self.transitions.append(DialogTransition(
-            DialogState.PROPOSING,
-            DialogState.TROUBLESHOOTING,
+            AdaptiveDialogState.PROPOSING,
+            AdaptiveDialogState.TROUBLESHOOTING,
             lambda ctx: ctx.get('user_accepted_solution', False),
             priority=10
         ))
         
         # PROPOSING → ESCALATING (user rejects, prefers human)
         self.transitions.append(DialogTransition(
-            DialogState.PROPOSING,
-            DialogState.ESCALATING,
+            AdaptiveDialogState.PROPOSING,
+            AdaptiveDialogState.ESCALATING,
             lambda ctx: (
                 ctx.get('user_rejected', False) and
                 ctx.get('alternatives_offered', 0) >= 1
@@ -140,32 +145,32 @@ class AdaptiveDialogFlowEngine:
         
         # TROUBLESHOOTING → VALIDATING (user reports attempting step)
         self.transitions.append(DialogTransition(
-            DialogState.TROUBLESHOOTING,
-            DialogState.VALIDATING,
+            AdaptiveDialogState.TROUBLESHOOTING,
+            AdaptiveDialogState.VALIDATING,
             lambda ctx: ctx.get('step_attempted', False),
             priority=10
         ))
         
         # TROUBLESHOOTING → ESCALATING (too many failed attempts)
         self.transitions.append(DialogTransition(
-            DialogState.TROUBLESHOOTING,
-            DialogState.ESCALATING,
+            AdaptiveDialogState.TROUBLESHOOTING,
+            AdaptiveDialogState.ESCALATING,
             lambda ctx: ctx.get('failed_step_count', 0) >= 3,
             priority=13
         ))
         
         # VALIDATING → RESOLVED (solution worked!)
         self.transitions.append(DialogTransition(
-            DialogState.VALIDATING,
-            DialogState.RESOLVED,
+            AdaptiveDialogState.VALIDATING,
+            AdaptiveDialogState.RESOLVED,
             lambda ctx: ctx.get('solution_worked', False),
             priority=10
         ))
         
         # VALIDATING → TROUBLESHOOTING (solution didn't work, try next step)
         self.transitions.append(DialogTransition(
-            DialogState.VALIDATING,
-            DialogState.TROUBLESHOOTING,
+            AdaptiveDialogState.VALIDATING,
+            AdaptiveDialogState.TROUBLESHOOTING,
             lambda ctx: (
                 not ctx.get('solution_worked', False) and
                 ctx.get('steps_remaining', 0) > 0
@@ -175,8 +180,8 @@ class AdaptiveDialogFlowEngine:
         
         # VALIDATING → ESCALATING (ran out of steps, nothing worked)
         self.transitions.append(DialogTransition(
-            DialogState.VALIDATING,
-            DialogState.ESCALATING,
+            AdaptiveDialogState.VALIDATING,
+            AdaptiveDialogState.ESCALATING,
             lambda ctx: (
                 not ctx.get('solution_worked', False) and
                 ctx.get('steps_remaining', 0) == 0
@@ -186,16 +191,16 @@ class AdaptiveDialogFlowEngine:
         
         # RESOLVED → FEEDBACK (ask for satisfaction rating)
         self.transitions.append(DialogTransition(
-            DialogState.RESOLVED,
-            DialogState.FEEDBACK,
+            AdaptiveDialogState.RESOLVED,
+            AdaptiveDialogState.FEEDBACK,
             lambda ctx: True,  # Always ask for feedback after resolution
             priority=5
         ))
         
         # ESCALATING → FEEDBACK (after escalation, ask for feedback)
         self.transitions.append(DialogTransition(
-            DialogState.ESCALATING,
-            DialogState.FEEDBACK,
+            AdaptiveDialogState.ESCALATING,
+            AdaptiveDialogState.FEEDBACK,
             lambda ctx: ctx.get('escalation_completed', False),
             priority=5
         ))
@@ -211,7 +216,7 @@ class AdaptiveDialogFlowEngine:
         # Accept if we have enough detail or already asked multiple times
         return len(problem_desc) >= min_length or attempts_count >= 2
     
-    def get_next_state(self, current_state: DialogState, context: Dict) -> Tuple[DialogState, str]:
+    def get_next_state(self, current_state: AdaptiveDialogState, context: Dict) -> Tuple[AdaptiveDialogState, str]:
         """
         Determine next state based on current state and context.
         Returns (next_state, reason_for_transition).
@@ -267,7 +272,7 @@ class AdaptiveDialogFlowEngine:
     
     def get_next_action(
         self,
-        current_state: DialogState,
+        current_state: AdaptiveDialogState,
         user_profile: Optional[UserProfile] = None,
         context: Optional[Dict] = None
     ) -> Dict[str, Any]:
@@ -279,15 +284,15 @@ class AdaptiveDialogFlowEngine:
         context = context or {}
         
         actions_map = {
-            DialogState.GREETING: self._action_greeting,
-            DialogState.LISTENING: self._action_listening,
-            DialogState.ANALYZING: self._action_analyzing,
-            DialogState.PROPOSING: self._action_proposing,
-            DialogState.TROUBLESHOOTING: self._action_troubleshooting,
-            DialogState.VALIDATING: self._action_validating,
-            DialogState.ESCALATING: self._action_escalating,
-            DialogState.RESOLVED: self._action_resolved,
-            DialogState.FEEDBACK: self._action_feedback,
+            AdaptiveDialogState.GREETING: self._action_greeting,
+            AdaptiveDialogState.LISTENING: self._action_listening,
+            AdaptiveDialogState.ANALYZING: self._action_analyzing,
+            AdaptiveDialogState.PROPOSING: self._action_proposing,
+            AdaptiveDialogState.TROUBLESHOOTING: self._action_troubleshooting,
+            AdaptiveDialogState.VALIDATING: self._action_validating,
+            AdaptiveDialogState.ESCALATING: self._action_escalating,
+            AdaptiveDialogState.RESOLVED: self._action_resolved,
+            AdaptiveDialogState.FEEDBACK: self._action_feedback,
         }
         
         action_fn = actions_map.get(current_state)
@@ -303,7 +308,7 @@ class AdaptiveDialogFlowEngine:
             greeting = f"Halo {user.phone_number}! Ada yang bisa kami bantu? 🤔"
         
         return {
-            'state': DialogState.GREETING.value,
+            'state': AdaptiveDialogState.GREETING.value,
             'action': 'greet',
             'message': greeting,
             'next_step': 'Wait for user problem description',
@@ -321,7 +326,7 @@ class AdaptiveDialogFlowEngine:
             question = "Terburu-buru? Jelaskan masalahnya sesingkat mungkin, saya akan bantu dengan cepat ⚡"
         
         return {
-            'state': DialogState.LISTENING.value,
+            'state': AdaptiveDialogState.LISTENING.value,
             'action': 'ask_detail',
             'message': question,
             'collect_fields': ['problem_description', 'device_info', 'steps_tried'],
@@ -332,7 +337,7 @@ class AdaptiveDialogFlowEngine:
         """Analyzing action - think through the problem"""
         
         return {
-            'state': DialogState.ANALYZING.value,
+            'state': AdaptiveDialogState.ANALYZING.value,
             'action': 'analyze',
             'message': "Saya sedang menganalisis masalahnya... ⏳",
             'analyze_tools': ['semantic_matching', 'kb_search', 'user_history'],
@@ -349,7 +354,7 @@ class AdaptiveDialogFlowEngine:
             message = "Saya punya solusinya:"
         
         return {
-            'state': DialogState.PROPOSING.value,
+            'state': AdaptiveDialogState.PROPOSING.value,
             'action': 'propose_solution',
             'message': message,
             'include': ['first_step', 'expected_outcome', 'if_fails_message'],
@@ -362,7 +367,7 @@ class AdaptiveDialogFlowEngine:
         current_step = ctx.get('current_step', 1)
         
         return {
-            'state': DialogState.TROUBLESHOOTING.value,
+            'state': AdaptiveDialogState.TROUBLESHOOTING.value,
             'action': 'execute_troubleshooting',
             'message': f"Langkah {current_step}: [Specific instruction for this step]",
             'include': ['detailed_instructions', 'verification_criteria', 'help_if_stuck'],
@@ -374,7 +379,7 @@ class AdaptiveDialogFlowEngine:
         """Validating action - check if solution worked"""
         
         return {
-            'state': DialogState.VALIDATING.value,
+            'state': AdaptiveDialogState.VALIDATING.value,
             'action': 'validate_outcome',
             'message': "Apakah langkah tadi berhasil? 🤞",
             'options': ['worked', 'partially_worked', 'failed', 'not_attempted'],
@@ -398,7 +403,7 @@ class AdaptiveDialogFlowEngine:
             )
         
         return {
-            'state': DialogState.ESCALATING.value,
+            'state': AdaptiveDialogState.ESCALATING.value,
             'action': 'escalate_to_human',
             'message': message,
             'escalation_priority': ctx.get('escalation_priority', 'normal'),
@@ -414,7 +419,7 @@ class AdaptiveDialogFlowEngine:
             message = "Masalah terselesaikan! Bagus! 👍"
         
         return {
-            'state': DialogState.RESOLVED.value,
+            'state': AdaptiveDialogState.RESOLVED.value,
             'action': 'celebrate_resolution',
             'message': message,
             'record_metrics': {
@@ -429,7 +434,7 @@ class AdaptiveDialogFlowEngine:
         """Feedback action - gather user satisfaction"""
         
         return {
-            'state': DialogState.FEEDBACK.value,
+            'state': AdaptiveDialogState.FEEDBACK.value,
             'action': 'collect_feedback',
             'message': "Berapa rating untuk bantuan kami? (1-5 bintang) ⭐",
             'options': ['1', '2', '3', '4', '5'],

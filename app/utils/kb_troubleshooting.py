@@ -481,6 +481,133 @@ KB_TROUBLESHOOTING = {
             "data_loss_risk": False,
         },
     },
+
+    # ========== MAINTENANCE / PERAWATAN RUTIN ==========
+    "maintenance": {
+        "category_id": "maintenance",
+        "title": "Pemeliharaan & Perawatan Rutin",
+        "keywords": [
+            "maintenance", "perawatan", "servis", "service", "jadwal",
+            "berkala", "oli", "ban", "tire", "rutin", "inspeksi",
+            "tune up", "km", "kilometer", "jarak tempuh", "reminder",
+            "pengingat", "cek rutin", "schedule", "jadwal servis",
+            "ganti oli", "filter", "radiator", "coolant", "rem", "brake",
+            "wiper", "lampu", "light", "aki", "battery", "accu"
+        ],
+        "description": "Jadwal perawatan kendaraan, servis berkala, dan reminder maintenance",
+        "symptoms": [
+            "Jadwal servis terlewat",
+            "Reminder maintenance tidak muncul",
+            "Tidak tahu kapan servis berikutnya",
+            "Odometer tidak terupdate",
+            "Riwayat servis hilang",
+        ],
+        "first_response": "Baik, saya bantu terkait perawatan kendaraan. Mari kita cek jadwal dan kebutuhan maintenance-nya 🔧",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Cek jadwal servis di sistem",
+                "instruction": "Buka aplikasi TRAMOS → Menu Kendaraan → Pilih unit → Tab 'Maintenance'. Lihat jadwal servis berikutnya berdasarkan kilometer atau waktu.",
+                "verification": "Jadwal servis terbaru terlihat di layar.",
+            },
+            {
+                "step": 2,
+                "title": "Perbarui data odometer",
+                "instruction": "Jika jarak tempuh tidak otomatis terupdate dari GPS, input manual: Kendaraan → Update Odometer → Masukkan km terbaru.",
+                "verification": "Angka km di sistem sudah sesuai dengan speedometer kendaraan.",
+            },
+            {
+                "step": 3,
+                "title": "Aktifkan reminder otomatis",
+                "instruction": "Masuk ke Settings → Notifications → Aktifkan 'Maintenance Reminder'. Set interval pengingat: 7 hari, 3 hari, dan 1 hari sebelum jadwal.",
+                "verification": "Notifikasi test diterima di WhatsApp.",
+            },
+            {
+                "step": 4,
+                "title": "Catat riwayat servis terbaru",
+                "instruction": "Setelah servis selesai, input di TRAMOS: Kendaraan → Riwayat Servis → Tambah Record. Isi: tanggal, jenis servis, biaya, bengkel.",
+                "verification": "Record servis muncul di riwayat kendaraan.",
+            },
+        ],
+        "workaround": "Catat jadwal servis secara manual dan hubungi koordinator fleet untuk penjadwalan ulang.",
+        "escalation_triggers": [
+            "Kendaraan sudah sangat overdue servis (>2000 km dari jadwal)",
+            "Ada bunyi tidak normal dari mesin/rem",
+            "Warning light menyala di dashboard kendaraan",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["missed_schedule", "odometer_error", "notification_off"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== SENSOR & IoT DEVICE ISSUES ==========
+    "sensor": {
+        "category_id": "sensor",
+        "title": "Sensor & IoT Device",
+        "keywords": [
+            "sensor", "iot", "suhu", "temperature", "fuel", "bbm",
+            "bensin", "solar", "bahan bakar", "level", "tangki", "tank",
+            "odometer", "speed", "kecepatan", "rpm", "door",
+            "pintu", "segel", "seal", "geofence", "geo fence", "zona",
+            "alert", "notifikasi", "alarm", "buzzer", "panic", "sos",
+            "ibutton", "rfid", "driver id", "accelerometer", "getaran",
+            "vibration", "tilt", "kemiringan"
+        ],
+        "description": "Sensor IoT pada kendaraan: fuel sensor, temperature, door, geofence, dll",
+        "symptoms": [
+            "Sensor fuel tidak akurat",
+            "Data suhu tidak muncul",
+            "Alert geofence tidak berfungsi",
+            "Sensor pintu selalu open/close",
+            "Driver ID tidak terdeteksi",
+            "Alarm tidak berbunyi",
+        ],
+        "first_response": "Saya bantu troubleshoot masalah sensor. Mari kita identifikasi dan perbaiki 📊",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Identifikasi sensor bermasalah",
+                "instruction": "Buka TRAMOS → Kendaraan → Detail Unit → Tab 'Sensor'. Cek status setiap sensor: Hijau (OK), Kuning (Warning), Merah (Error).",
+                "verification": "Sensor yang bermasalah sudah teridentifikasi dari indikator warna.",
+            },
+            {
+                "step": 2,
+                "title": "Cek koneksi fisik sensor",
+                "instruction": "Pastikan kabel sensor terpasang dengan baik ke terminal device. Cek apakah ada kabel yang longgar, terputus, atau teroksidasi (berkarat).",
+                "verification": "Koneksi kabel sudah kencang dan bersih.",
+            },
+            {
+                "step": 3,
+                "title": "Kalibrasi ulang sensor",
+                "instruction": "Untuk fuel sensor: isi tangki penuh → catat pembacaan → kuras sebagian → catat lagi. Kirim data kalibrasi ke tim teknis. Untuk sensor lain: restart device dan tunggu 5 menit.",
+                "verification": "Pembacaan sensor sudah mendekati nilai aktual (toleransi ±5%).",
+            },
+            {
+                "step": 4,
+                "title": "Reset konfigurasi sensor di server",
+                "instruction": "Hubungi admin untuk reset parameter sensor dari server. Berikan info: ID kendaraan, jenis sensor, dan gejala masalah.",
+                "verification": "Data sensor sudah terupdate dan akurat di dashboard.",
+            },
+        ],
+        "workaround": "Gunakan metode manual (stik ukur untuk fuel, thermometer untuk suhu) sambil menunggu perbaikan sensor.",
+        "escalation_triggers": [
+            "Sensor fisik rusak/pecah",
+            "Kabel terputus tidak bisa disambung",
+            "Butuh penggantian hardware sensor",
+            "Data sensor sangat jauh dari realita (>20% deviasi)",
+        ],
+        "metadata": {
+            "typical_resolution_time": "15-30 minutes",
+            "technical_difficulty": "high",
+            "common_root_causes": ["wiring", "calibration", "hardware_failure", "water_damage"],
+            "requires_hardware_access": True,
+            "data_loss_risk": False,
+        },
+    },
 }
 
 
@@ -489,11 +616,23 @@ KB_TROUBLESHOOTING = {
 # ============================================================================
 
 def get_kb_category(keywords: list) -> Optional[dict]:
-    """Find KB category metadata based on keywords"""
+    """Find best-matching KB category based on keywords.
+    Uses keyword hit counting for smarter matching instead of first-match.
+    """
+    if not keywords:
+        return None
+    
+    search_text = ' '.join(keywords).lower()
+    best_match = None
+    best_score = 0
+    
     for category, kb_data in KB_TROUBLESHOOTING.items():
-        if any(kw.lower() in ' '.join(keywords).lower() for kw in kb_data["keywords"]):
-            return {"category": category, **kb_data}
-    return None
+        score = sum(1 for kw in kb_data["keywords"] if kw.lower() in search_text)
+        if score > best_score:
+            best_score = score
+            best_match = {"category": category, "confidence": min(1.0, score / 3.0), **kb_data}
+    
+    return best_match
 
 
 def get_category_by_id(category_id: str) -> Optional[dict]:
