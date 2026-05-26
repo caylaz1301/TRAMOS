@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: tramos_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tramos_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - tramos_pgdata:/var/lib/postgresql/data
+
+volumes:
+  tramos_pgdata:
