@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { analyticsService, benchmarkService } from '../api.js';
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import DateFilter from '../components/DateFilter';
 import './PerformancePage.css';
 
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const CHART_TOOLTIP = {
-  backgroundColor: '#1a2332',
-  titleColor: '#f0f4f8',
-  bodyColor: '#8b9bb4',
-  borderColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: '#ffffff',
+  titleColor: '#111827',
+  bodyColor: '#4b5563',
+  borderColor: '#e5e7eb',
   borderWidth: 1,
   cornerRadius: 8,
   padding: 10,
@@ -22,13 +23,14 @@ export default function PerformancePage() {
   const [benchmark, setBenchmark] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
 
   const fetchData = async () => {
     try {
       setError(null);
       const [perfData, dashData, benchData] = await Promise.all([
-        analyticsService.getPerformance().catch(() => null),
-        analyticsService.getDashboard().catch(() => null),
+        analyticsService.getPerformance(dateRange.startDate, dateRange.endDate).catch(() => null),
+        analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
         benchmarkService.getScore().catch(() => null),
       ]);
       setPerf(perfData);
@@ -43,7 +45,7 @@ export default function PerformancePage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   if (loading) {
     return (
@@ -77,7 +79,7 @@ export default function PerformancePage() {
     datasets: [{
       data: [aiSolved, totalTickets, abandoned],
       backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-      borderColor: '#1a2332',
+      borderColor: '#ffffff',
       borderWidth: 3,
     }],
   };
@@ -86,7 +88,7 @@ export default function PerformancePage() {
     maintainAspectRatio: false,
     cutout: '70%',
     plugins: {
-      legend: { position: 'bottom', labels: { color: '#8b9bb4', font: { size: 12, weight: 500 }, padding: 14, usePointStyle: true, pointStyleWidth: 8 } },
+      legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 12, weight: 500 }, padding: 14, usePointStyle: true, pointStyleWidth: 8 } },
       tooltip: CHART_TOOLTIP,
     },
   };
@@ -110,16 +112,16 @@ export default function PerformancePage() {
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: CHART_TOOLTIP },
     scales: {
-      x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false }, ticks: { color: '#5a6d84', stepSize: 1 } },
-      y: { grid: { display: false }, ticks: { color: '#8b9bb4', font: { size: 13, weight: 500 } } },
+      x: { beginAtZero: true, grid: { color: '#f3f4f6', drawBorder: false }, ticks: { color: '#9ca3af', stepSize: 1 } },
+      y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 13, weight: 500 } } },
     },
   };
 
   // Metric cards
   const metrics = [
-    { label: 'Tingkat Penyelesaian', value: `${completionRate}%`, desc: 'Percakapan yang berhasil diselesaikan oleh chatbot', color: 'emerald' },
-    { label: 'Sesi Dieskalasi', value: totalTickets, desc: 'Masalah yang diteruskan ke tim support manusia', color: 'amber' },
-    { label: 'Rata-rata Pesan', value: overview.avg_messages_per_session || 0, desc: 'Jumlah pesan rata-rata sebelum masalah terselesaikan', color: 'blue' },
+    { label: 'Tingkat Penyelesaian', value: `${Math.round(completionRate)}%`, desc: 'Percakapan yang berhasil diselesaikan oleh chatbot', color: 'emerald' },
+    { label: 'Sesi Dieskalasi', value: totalTickets, desc: 'Masalah yang diteruskan ke tim support', color: 'amber' },
+    { label: 'Rata-rata Pesan', value: Math.round(overview.avg_messages_per_session || 0), desc: 'Jumlah chat bolak-balik per sesi', color: 'blue' },
     { label: 'Sesi Dibatalkan', value: abandoned, desc: 'Pengguna yang pergi sebelum masalah selesai ditangani', color: 'rose' },
   ];
 
@@ -134,6 +136,8 @@ export default function PerformancePage() {
           <p className="page-subtitle">Evaluasi efektivitas chatbot dalam menangani laporan</p>
         </div>
       </div>
+
+      <DateFilter onFilterChange={setDateRange} />
 
       {error && (
         <div className="page-error">⚠️ {error}<button onClick={fetchData}>Coba Lagi</button></div>
@@ -161,8 +165,8 @@ export default function PerformancePage() {
               {score >= 70
                 ? 'Chatbot menangani sebagian besar masalah dengan baik tanpa perlu eskalasi ke tim support.'
                 : score >= 40
-                ? 'Chatbot cukup membantu, namun masih banyak masalah yang perlu ditangani tim support.'
-                : 'Sebagian besar percakapan berakhir dengan eskalasi. Pertimbangkan untuk menambah solusi di Knowledge Base.'
+                  ? 'Chatbot cukup membantu, namun masih banyak masalah yang perlu ditangani tim support.'
+                  : 'Sebagian besar percakapan berakhir dengan eskalasi. Pertimbangkan untuk menambah solusi di Knowledge Base.'
               }
             </p>
           </div>

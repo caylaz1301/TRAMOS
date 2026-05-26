@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { analyticsService } from '../api.js';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import DateFilter from '../components/DateFilter';
 import './OverviewPage.css';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 const CHART_TOOLTIP = {
-  backgroundColor: '#1a2332',
-  titleColor: '#f0f4f8',
-  bodyColor: '#8b9bb4',
-  borderColor: 'rgba(255,255,255,0.08)',
+  backgroundColor: '#ffffff',
+  titleColor: '#111827',
+  bodyColor: '#4b5563',
+  borderColor: '#e5e7eb',
   borderWidth: 1,
   cornerRadius: 8,
   padding: 10,
@@ -21,11 +22,12 @@ export default function OverviewPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
 
   const fetchData = async () => {
     try {
       setError(null);
-      const dashData = await analyticsService.getDashboard();
+      const dashData = await analyticsService.getDashboard(dateRange.startDate, dateRange.endDate);
       setData(dashData);
     } catch (err) {
       setError('Gagal memuat data. Pastikan server backend aktif.');
@@ -39,7 +41,7 @@ export default function OverviewPage() {
     fetchData();
     const interval = setInterval(fetchData, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [dateRange]);
 
   if (loading && !data) {
     return (
@@ -107,7 +109,7 @@ export default function OverviewPage() {
         </svg>
       ),
       color: 'violet',
-      desc: `Rata-rata ${avgMessages} per sesi`,
+      desc: `Rata-rata ${Math.round(avgMessages)} per sesi`,
     },
   ];
 
@@ -118,7 +120,7 @@ export default function OverviewPage() {
     datasets: [{
       data: categories.map(c => c.count),
       backgroundColor: categories.map((_, i) => catColors[i % catColors.length]),
-      borderColor: '#1a2332',
+      borderColor: '#ffffff',
       borderWidth: 3,
       hoverBorderWidth: 0,
     }],
@@ -130,7 +132,7 @@ export default function OverviewPage() {
     plugins: {
       legend: {
         position: 'bottom',
-        labels: { color: '#8b9bb4', font: { size: 12, weight: 500 }, padding: 16, usePointStyle: true, pointStyleWidth: 8 },
+        labels: { color: '#9ca3af', font: { size: 12, weight: 500 }, padding: 16, usePointStyle: true, pointStyleWidth: 8 },
       },
       tooltip: CHART_TOOLTIP,
     },
@@ -153,17 +155,17 @@ export default function OverviewPage() {
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: CHART_TOOLTIP },
     scales: {
-      x: { grid: { display: false }, ticks: { color: '#8b9bb4', font: { size: 12, weight: 500 } } },
-      y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false }, ticks: { color: '#5a6d84', stepSize: 1, font: { size: 11 } } },
+      x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 12, weight: 500 } } },
+      y: { beginAtZero: true, grid: { color: '#f3f4f6', drawBorder: false }, ticks: { color: '#9ca3af', stepSize: 1, font: { size: 11 } } },
     },
   };
 
   // Quality metrics
   const avgDurationMin = Math.round((quality.avg_duration_seconds || 0) / 60);
   const qualityItems = [
-    { label: 'Selesai', value: `${quality.completion_rate || 0}%`, color: 'emerald', desc: 'Sesi yang selesai dengan baik' },
-    { label: 'Durasi', value: avgDurationMin > 60 ? `${Math.round(avgDurationMin/60)}j ${avgDurationMin%60}m` : `${avgDurationMin}m`, color: 'blue', desc: 'Rata-rata waktu per sesi' },
-    { label: 'Pesan', value: quality.avg_messages || 0, color: 'violet', desc: 'Rata-rata pesan per percakapan' },
+    { label: 'Tingkat Selesai', value: `${Math.round(quality.completion_rate || 0)}%`, color: 'emerald', desc: 'Sesi yang selesai dengan baik' },
+    { label: 'Durasi', value: avgDurationMin > 60 ? `${Math.floor(avgDurationMin/60)}j ${avgDurationMin%60}m` : `${avgDurationMin}m`, color: 'blue', desc: 'Rata-rata waktu per sesi' },
+    { label: 'Rata-rata Pesan', value: Math.round(quality.avg_messages || 0), color: 'violet', desc: 'Jumlah chat per percakapan' },
     { label: 'Dibatalkan', value: quality.abandoned_sessions || 0, color: 'rose', desc: 'Sesi yang tidak dilanjutkan' },
   ];
 
@@ -179,6 +181,8 @@ export default function OverviewPage() {
           <span>Diperbarui otomatis</span>
         </div>
       </div>
+
+      <DateFilter onFilterChange={setDateRange} />
 
       {error && (
         <div className="page-error">⚠️ {error}<button onClick={fetchData}>Coba Lagi</button></div>
@@ -306,7 +310,7 @@ export default function OverviewPage() {
                         <div className="user-avatar-sm">{(s.name || '?').charAt(0).toUpperCase()}</div>
                         <div>
                           <div className="user-name-cell">{s.name || 'Tanpa Nama'}</div>
-                          <div className="user-phone-cell">{s.phone ? `...${s.phone.slice(-4)}` : ''}</div>
+                          <div className="user-phone-cell">{s.phone || ''}</div>
                         </div>
                       </div>
                     </td>

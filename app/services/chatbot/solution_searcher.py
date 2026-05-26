@@ -13,70 +13,57 @@ from app.config import settings
 from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
 from app.utils.smart_response_system import smart_response_system
 from app.utils.ai_logic import ai_engine
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "mistral"
+# ── Gemini config (shared key from settings) ──
+_GEMINI_MODEL = getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
+_GEMINI_API_KEY = getattr(settings, 'GEMINI_API_KEY', '')
 
 
 class SolutionSearcher:
-    """Intelligent solution finder using AI + KB matching"""
+    """Intelligent solution finder using Gemini AI + KB matching"""
     
     def __init__(self):
-        """Initialize solution searcher"""
+        """Initialize solution searcher with Gemini"""
         self.use_llm = settings.USE_LLM
-        self.ollama_available = self._check_ollama_connection()
+        
+        # Initialize Gemini client
+        self.gemini_client = None
+        self.gemini_available = False
+        if _GEMINI_API_KEY:
+            try:
+                genai.configure(api_key=_GEMINI_API_KEY)
+                self.gemini_client = genai.GenerativeModel(_GEMINI_MODEL)
+                self.gemini_available = True
+            except Exception as e:
+                logger.error(f"❌ SolutionSearcher Gemini init failed: {e}")
         
         # Use unified smart response system
         self.response_system = smart_response_system
         
         # Cache KB summary for AI searches
         self._kb_summary_cache = None
-        # Cache last Ollama connection check time to avoid repeated checks
-        self._last_ollama_check = 0
         
-        if self.use_llm and self.ollama_available:
-            logger.info("✓ Solution Searcher initialized with AI")
+        if self.use_llm and self.gemini_available:
+            logger.info("✓ Solution Searcher initialized with Gemini AI")
         else:
             logger.warning("⚠️ Solution Searcher: Using keyword matching fallback")
     
-    def _check_ollama_connection(self) -> bool:
-        """Check if Ollama server is running"""
+    def _query_gemini(self, prompt: str, temperature: float = 0.3) -> str:
+        """Query Gemini LLM"""
         try:
-            response = requests.get(
-                "http://localhost:11434/api/tags",
-                timeout=2
+            response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=temperature,
+                    max_output_tokens=300,
+                )
             )
-            return response.status_code == 200
+            return response.text.strip()
         except Exception as e:
-            logger.warning(f"Ollama connection check failed: {e}")
-            return False
-    
-    def _query_ollama(self, prompt: str, temperature: float = 0.3) -> str:
-        """Query Ollama LLM"""
-        try:
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": temperature,
-                    "top_k": 40,
-                    "top_p": 0.9,
-                    "num_ctx": 2048,
-                },
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return response.json().get("response", "").strip()
-            else:
-                logger.warning(f"Ollama error: {response.status_code}")
-                return ""
-        except Exception as e:
-            logger.warning(f"Ollama query failed: {e}")
+            logger.warning(f"Gemini query failed: {e}")
             return ""
     
     def search_solutions(self, problem_description: str, category: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -91,7 +78,7 @@ class SolutionSearcher:
             return []
         
         # Try AI-powered semantic matching first
-        if self.use_llm and self.ollama_available:
+        if self.use_llm and self.gemini_available:
             solutions = self._ai_search_solutions(problem_description)
             if solutions:
                 return solutions
@@ -127,7 +114,7 @@ Return ONLY a JSON object with:
 Be strict: only return one of the listed categories. If no match, set best_match to null."""
         
         try:
-            response_text = self._query_ollama(prompt, temperature=0.1)
+            response_text = self._query_gemini(prompt, temperature=0.1)
             
             # Extract JSON from response (sometimes model adds extra text)
             json_start = response_text.find('{')

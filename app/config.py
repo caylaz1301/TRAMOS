@@ -53,6 +53,9 @@ class Settings:
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     OPERATOR_EMAILS: list = [email.strip() for email in os.getenv("OPERATOR_EMAILS", "").split(",") if email.strip()]
     
+    # ===== Google OAuth =====
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    
     # ===== CORS Configuration =====
     CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "*").split(",")
 

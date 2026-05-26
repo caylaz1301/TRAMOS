@@ -73,18 +73,24 @@ Problem Report:
 "{problem_description}"
 
 CATEGORY GUIDE:
-- GPS: Issues with tracking, location, signal, navigation (keywords: gps, tracking, lokasi, signal, hilang, posisi)
-- Camera: Recording issues, video problems (keywords: kamera, video, rekam, feed, display)
-- Battery: Power, charging issues (keywords: baterai, battery, power, charge, mati, cepat habis)
-- Connectivity: Internet, network, wifi (keywords: internet, koneksi, network, wifi, offline, signal)
-- Billing: Payment issues (keywords: tagihan, invoice, billing, biaya)
-- Maintenance: Service, repair needed  
-- Service: General issues that don't fit above
-- Other: Unknown
+- GPS: Tracking, location, signal, navigation (keywords: gps, tracking, lokasi, signal, hilang, posisi, peta)
+- Camera: Recording, video problems (keywords: kamera, video, rekam, feed, dashcam)
+- Connectivity: Internet, network, wifi (keywords: internet, koneksi, network, wifi, offline, lambat, putus)
+- Device: Hardware device issues (keywords: device, perangkat, hardware, mati, restart, error)
+- Vehicle: Vehicle-specific problems (keywords: kendaraan, mobil, truk, mesin, rem, ban)
+- App: Application/software issues (keywords: aplikasi, app, crash, bug, update, error)
+- Billing: Payment issues (keywords: tagihan, invoice, billing, biaya, bayar)
+- Ticket: Support ticket issues (keywords: tiket, ticket, support, bantuan, lapor)
+- Maintenance: Service, repair, scheduling (keywords: maintenance, perawatan, servis, jadwal, oli)
+- Sensor: IoT sensor problems (keywords: sensor, fuel, suhu, temperature, geofence, alarm)
+- Driver: Driver behavior, management (keywords: driver, pengemudi, sopir, speeding, pelanggaran)
+- Report: Reports, data export (keywords: laporan, report, export, download, riwayat, statistik)
+- Account: Login, password, access (keywords: login, password, akun, lupa, reset, hak akses)
+- Other: Unknown category
 
 Extract and return JSON with these fields:
 {{
-    "category": One of [GPS, Camera, Battery, Connectivity, Billing, Maintenance, Service, Other],
+    "category": One of [GPS, Camera, Connectivity, Device, Vehicle, App, Billing, Ticket, Maintenance, Sensor, Driver, Report, Account, Other],
     "severity": "low" | "medium" | "high" | "critical",
     "affected_systems": ["list", "of", "systems"],
     "error_description": "brief error summary",
@@ -137,26 +143,42 @@ Be precise. Only return valid JSON.
         """Fallback keyword-based extraction"""
         description_lower = problem_description.lower()
         
-        # Determine category
-        if any(keyword in description_lower for keyword in ['gps', 'tracking', 'lokasi', 'signal', 'hilang']):
+        # Determine category — check most specific first
+        if any(kw in description_lower for kw in ['sensor', 'fuel', 'suhu', 'temperature', 'geofence', 'alarm', 'tangki', 'bbm', 'odometer']):
+            category = 'Sensor'
+        elif any(kw in description_lower for kw in ['driver', 'pengemudi', 'sopir', 'supir', 'speeding', 'ngebut', 'pelanggaran', 'rem mendadak', 'skor driver']):
+            category = 'Driver'
+        elif any(kw in description_lower for kw in ['gps', 'tracking', 'lokasi', 'signal gps', 'posisi', 'peta', 'koordinat', 'tidak terlacak']):
             category = 'GPS'
-        elif any(keyword in description_lower for keyword in ['kamera', 'video', 'rekam', 'feed', 'display']):
+        elif any(kw in description_lower for kw in ['kamera', 'video', 'rekam', 'dashcam', 'feed', 'recording']):
             category = 'Camera'
-        elif any(keyword in description_lower for keyword in ['baterai', 'battery', 'power', 'charge', 'mati']):
-            category = 'Battery'
-        elif any(keyword in description_lower for keyword in ['internet', 'koneksi', 'network', 'wifi', 'offline', 'lelet', 'lambat', 'slow', 'lemot', 'lag', 'disconnect', 'putus']):
+        elif any(kw in description_lower for kw in ['internet', 'koneksi', 'network', 'wifi', 'offline', 'lelet', 'lambat', 'slow', 'lemot', 'lag', 'disconnect', 'putus']):
             category = 'Connectivity'
-        elif any(keyword in description_lower for keyword in ['tagihan', 'invoice', 'billing', 'biaya']):
+        elif any(kw in description_lower for kw in ['maintenance', 'perawatan', 'servis', 'service', 'oli', 'ban', 'jadwal servis', 'tune up']):
+            category = 'Maintenance'
+        elif any(kw in description_lower for kw in ['login', 'password', 'akun', 'lupa password', 'reset password', 'hak akses', 'blocked']):
+            category = 'Account'
+        elif any(kw in description_lower for kw in ['laporan', 'report', 'export', 'download', 'unduh', 'riwayat', 'statistik', 'excel', 'csv']):
+            category = 'Report'
+        elif any(kw in description_lower for kw in ['tagihan', 'invoice', 'billing', 'biaya', 'bayar', 'pembayaran']):
             category = 'Billing'
+        elif any(kw in description_lower for kw in ['tiket', 'ticket', 'support', 'bantuan', 'lapor', 'aduan']):
+            category = 'Ticket'
+        elif any(kw in description_lower for kw in ['device', 'perangkat', 'hardware', 'restart', 'reboot', 'modul']):
+            category = 'Device'
+        elif any(kw in description_lower for kw in ['kendaraan', 'mobil', 'truk', 'mesin', 'plat', 'unit']):
+            category = 'Vehicle'
+        elif any(kw in description_lower for kw in ['aplikasi', 'app', 'crash', 'bug', 'update', 'install', 'versi']):
+            category = 'App'
         else:
-            category = 'Service'
+            category = 'Other'
         
         # Determine severity
-        if any(word in description_lower for word in ['urgent', 'emergency', 'sangat', 'gawat', 'kritis']):
+        if any(word in description_lower for word in ['urgent', 'emergency', 'sangat', 'gawat', 'kritis', 'darurat', 'bahaya']):
             severity = 'critical'
-        elif any(word in description_lower for word in ['penting', 'serius', 'serious', 'important']):
+        elif any(word in description_lower for word in ['penting', 'serius', 'serious', 'important', 'parah']):
             severity = 'high'
-        elif any(word in description_lower for word in ['sedikit', 'minor', 'kecil']):
+        elif any(word in description_lower for word in ['sedikit', 'minor', 'kecil', 'ringan']):
             severity = 'low'
         else:
             severity = 'medium'

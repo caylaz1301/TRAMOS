@@ -104,7 +104,7 @@
 }
 
 .comp-row:hover {
-  background: rgba(255,255,255,0.02);
+  background: #f8f9fb;
 }
 
 .comp-icon {
@@ -147,7 +147,7 @@
 }
 
 .alert-row:last-child { border-bottom: none; }
-.alert-row:hover { background: rgba(255,255,255,0.02); }
+.alert-row:hover { background: #f8f9fb; }
 
 .alert-dot {
   width: 8px;
@@ -226,7 +226,7 @@
 }
 
 .insight-row:last-child { border-bottom: none; }
-.insight-row:hover { background: rgba(255,255,255,0.02); }
+.insight-row:hover { background: #f8f9fb; }
 
 .insight-icon-wrap {
   width: 32px;
@@ -430,7 +430,7 @@
 }
 
 .rec-row:last-child { border-bottom: none; }
-.rec-row:hover { background: rgba(255,255,255,0.02); }
+.rec-row:hover { background: #f8f9fb; }
 
 .rec-priority {
   font-size: 14px;
@@ -470,7 +470,7 @@
 }
 
 .activity-row:last-child { border-bottom: none; }
-.activity-row:hover { background: rgba(255,255,255,0.02); }
+.activity-row:hover { background: #f8f9fb; }
 
 .activity-icon {
   font-size: 16px;

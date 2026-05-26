@@ -64,7 +64,7 @@ class DialogFlowHandler:
         problem_prompt = f"Terima kasih {driver_name}! 😊\n\n"
         problem_prompt += smart_response_system.format_question(
             "Ceritakan masalah yang Anda alami",
-            options=["GPS tidak berfungsi", "Kamera error", "Baterai cepat habis", "Masalah koneksi"]
+            options=["GPS tidak akurat", "Koneksi putus-putus", "Kamera error", "Sensor BBM bermasalah", "Lupa password", "Butuh laporan"]
         )
         return (smart_response_system.format_for_whatsapp(problem_prompt), DialogState.COLLECTING_PROBLEM)
     

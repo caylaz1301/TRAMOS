@@ -40,6 +40,29 @@ api.interceptors.response.use(
 
 // Auth service
 export const authService = {
+  register: async (fullName, email, password, phone) => {
+    const response = await api.post('/auth/register', {
+      full_name: fullName,
+      email,
+      password,
+      phone: phone || null,
+    });
+    return response.data;
+  },
+
+  verifyOtp: async (email, otpCode) => {
+    const response = await api.post('/auth/verify-otp', {
+      email,
+      otp_code: otpCode,
+    });
+    return response.data;
+  },
+
+  resendOtp: async (email) => {
+    const response = await api.post('/auth/resend-otp', { email });
+    return response.data;
+  },
+
   login: async (username, password) => {
     const response = await api.post('/auth/login', { username, password });
     return response.data;
@@ -61,13 +84,24 @@ export const authService = {
       params: { token }
     });
     return response.data;
+  },
+
+  googleLogin: async (idToken, isSignup = false) => {
+    const response = await api.post('/auth/google', {
+      id_token: idToken,
+      is_signup: isSignup,
+    });
+    return response.data;
   }
 };
 
 // Analytics service
 export const analyticsService = {
-  getDashboard: async () => {
-    const response = await api.get('/analytics/dashboard');
+  getDashboard: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    const response = await api.get('/analytics/dashboard', { params });
     return response.data;
   },
   
@@ -154,8 +188,11 @@ export const analyticsService = {
     return response.data;
   },
 
-  getPerformance: async () => {
-    const response = await api.get('/analytics/insights/performance');
+  getPerformance: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    const response = await api.get('/analytics/insights/performance', { params });
     return response.data;
   },
 
@@ -250,8 +287,11 @@ export const analyticsService = {
   },
 
   // ML Insights (new)
-  getMLInsights: async () => {
-    const response = await api.get('/analytics/ml-insights');
+  getMLInsights: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    const response = await api.get('/analytics/ml-insights', { params });
     return response.data;
   },
 

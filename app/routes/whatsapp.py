@@ -20,6 +20,7 @@ from app.services.chatbot.session_manager import DialogState
 from app.services.chatbot.dialog_flow_handler import DialogFlowHandler
 from app.services.chatbot.smart_dialog_flow import SmartDialogFlowHandler
 from app.services.chatbot.nlp_extractor import problem_extractor
+from app.utils.smart_response_system import smart_response_system
 from app.schemas.ticket import CreateTicketRequest
 from app.services.database_tracker import db_tracker
 
@@ -138,8 +139,45 @@ async def handle_incoming_message(request: Request) -> Response:
         changes = entry.get("changes", [{}])[0]
         value = changes.get("value", {})
         
+        statuses = value.get("statuses", [])
+        if statuses:
+            for status in statuses:
+                message_id = status.get("id", "unknown")
+                recipient_id = status.get("recipient_id", "unknown")
+                status_name = status.get("status", "unknown")
+                errors = status.get("errors", [])
+
+                if errors:
+                    for error in errors:
+                        logger.warning(
+                            "⚠️ WhatsApp delivery status: %s message_id=%s recipient=%s error_code=%s title=%s detail=%s",
+                            status_name,
+                            message_id,
+                            recipient_id,
+                            error.get("code", "unknown"),
+                            error.get("title", "unknown"),
+                            error.get("error_data", {}).get("details", error.get("message", "")),
+                        )
+                else:
+                    logger.info(
+                        "📬 WhatsApp delivery status: %s message_id=%s recipient=%s",
+                        status_name,
+                        message_id,
+                        recipient_id,
+                    )
+
+            return Response(
+                content=json.dumps({"status": "ok", "event": "statuses"}),
+                media_type="application/json",
+                status_code=200,
+            )
+
         messages = value.get("messages", [])
         if not messages:
+            logger.info(
+                "ℹ️ WhatsApp webhook event with no messages/statuses: keys=%s",
+                sorted(value.keys()),
+            )
             return Response(
                 content=json.dumps({"status": "ok"}), 
                 media_type="application/json"
@@ -302,6 +340,28 @@ async def process_message_with_ai(
     
     elif session.current_state == DialogState.COLLECTING_PROBLEM:
         # Collect problem description + extract category
+        problem_text = message_body.strip()
+        ack_only = problem_text.lower() in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS
+        if len(problem_text) < 5 or ack_only:
+            session.add_message(sender="user", message=message_body, intent="clarification", category=None)
+            response = (
+                "Saya belum menangkap detail masalahnya.\n\n"
+                "Tolong ceritakan kendala yang dialami driver/unit, misalnya:\n"
+                "- GPS tidak update lokasi\n"
+                "- Kamera mati atau layar hitam\n"
+                "- Kendaraan mogok di jalan\n"
+                "- Aplikasi error saat dipakai"
+            )
+            response = smart_response_system.format_for_whatsapp(response)
+            session.add_message(sender="bot", message=response, intent="clarification", category=None)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, session.current_state.value,
+                    intent="clarification", processing_time_ms=_ms)
+            return response
+
         session.problem_description = message_body.strip()
         session.add_message(sender="user", message=message_body, intent="data_collection", category=None)
         
@@ -627,6 +687,7 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
         
         if result.success:
             session.ticket_id = result.ticket_id
+            session.ticket_created = True
             session.current_state = DialogState.CLOSED
             
             response = (
@@ -724,6 +785,3 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
             f"❌ Terjadi kesalahan saat membuat tiket.\n\n"
             f"Silakan coba lagi atau hubungi support."
         )
-
-
-

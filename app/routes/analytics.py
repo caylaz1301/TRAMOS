@@ -5,7 +5,7 @@ Provides endpoints for dashboard data, ML analysis, and insights
 import logging
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, text
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -42,31 +42,57 @@ def get_db() -> Session:
     finally:
         db.close()
 
+def apply_date_filter(query, model, start_date: str = None, end_date: str = None):
+    """Helper to apply date filters to queries"""
+    if start_date:
+        try:
+            start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            query = query.filter(model.created_at >= start)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+            # If end date is at midnight, extend to end of day
+            if end.hour == 0 and end.minute == 0:
+                end = end.replace(hour=23, minute=59, second=59)
+            query = query.filter(model.created_at <= end)
+        except ValueError:
+            pass
+    return query
+
 
 # ============================================================================
 # BASIC STATISTICS
 # ============================================================================
 
 @router.get("/stats/overview")
-async def get_overview_stats(db: Session = Depends(get_db)):
+async def get_overview_stats(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get overview statistics"""
     try:
-        total_sessions = db.query(WhatsAppSession).count()
+        # Base query for sessions
+        base_query = db.query(WhatsAppSession)
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        total_sessions = filtered_query.count()
         
         # Total tickets created
-        total_tickets = db.query(WhatsAppSession).filter(
-            WhatsAppSession.ticket_id.isnot(None)
-        ).count()
+        tickets_query = db.query(WhatsAppSession).filter(WhatsAppSession.ticket_id.isnot(None))
+        tickets_filtered = apply_date_filter(tickets_query, WhatsAppSession, start_date, end_date)
+        total_tickets = tickets_filtered.count()
         
-        # Active sessions (last 5 minutes)
+        # Active sessions (last 5 minutes) - typically don't need date filter, but we'll apply if it's a historical range
         five_min_ago = datetime.now() - timedelta(minutes=5)
-        active_sessions = db.query(WhatsAppSession).filter(
+        active_query = db.query(WhatsAppSession).filter(
             WhatsAppSession.last_activity >= five_min_ago,
             WhatsAppSession.is_active == True
-        ).count()
+        )
+        active_filtered = apply_date_filter(active_query, WhatsAppSession, start_date, end_date)
+        active_sessions = active_filtered.count()
         
         # Total messages
-        total_messages = db.query(func.sum(WhatsAppSession.message_count)).scalar() or 0
+        msg_query = db.query(func.sum(WhatsAppSession.message_count))
+        msg_filtered = apply_date_filter(msg_query, WhatsAppSession, start_date, end_date)
+        total_messages = msg_filtered.scalar() or 0
         
         # Success rate
         success_rate = (total_tickets / total_sessions * 100) if total_sessions > 0 else 0
@@ -89,15 +115,17 @@ async def get_overview_stats(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/stats/categories")
-async def get_category_stats(db: Session = Depends(get_db)):
+async def get_category_stats(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get problem category distribution"""
     try:
-        categories = db.query(
+        base_query = db.query(
             WhatsAppSession.problem_category,
             func.count(WhatsAppSession.id).label("count")
         ).filter(
             WhatsAppSession.problem_category.isnot(None)
-        ).group_by(
+        )
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        categories = filtered_query.group_by(
             WhatsAppSession.problem_category
         ).all()
         
@@ -120,15 +148,17 @@ async def get_category_stats(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/stats/severity")
-async def get_severity_stats(db: Session = Depends(get_db)):
+async def get_severity_stats(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get problem severity distribution"""
     try:
-        severities = db.query(
+        base_query = db.query(
             WhatsAppSession.problem_severity,
             func.count(WhatsAppSession.id).label("count")
         ).filter(
             WhatsAppSession.problem_severity.isnot(None)
-        ).group_by(
+        )
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        severities = filtered_query.group_by(
             WhatsAppSession.problem_severity
         ).all()
         
@@ -151,16 +181,23 @@ async def get_severity_stats(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/stats/timeline")
-async def get_timeline_stats(db: Session = Depends(get_db)):
-    """Get sessions created over time (last 24 hours by hour)"""
+async def get_timeline_stats(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
+    """Get sessions created over time"""
     try:
-        # Get sessions from last 24 hours grouped by hour
-        sessions_by_hour = db.query(
+        base_query = db.query(
             func.date_trunc('hour', WhatsAppSession.created_at).label("hour"),
             func.count(WhatsAppSession.id).label("count")
-        ).filter(
-            WhatsAppSession.created_at >= datetime.now() - timedelta(hours=24)
-        ).group_by(
+        )
+        
+        if start_date or end_date:
+            filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        else:
+            # Default to last 24 hours if no date provided
+            filtered_query = base_query.filter(
+                WhatsAppSession.created_at >= datetime.now() - timedelta(hours=24)
+            )
+            
+        sessions_by_hour = filtered_query.group_by(
             func.date_trunc('hour', WhatsAppSession.created_at)
         ).order_by("hour").all()
         
@@ -183,10 +220,12 @@ async def get_timeline_stats(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/stats/quality")
-async def get_quality_metrics(db: Session = Depends(get_db)):
+async def get_quality_metrics(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get session quality metrics"""
     try:
-        sessions = db.query(WhatsAppSession).all()
+        base_query = db.query(WhatsAppSession)
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        sessions = filtered_query.all()
         
         if not sessions:
             return {
@@ -231,12 +270,12 @@ async def get_quality_metrics(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/data/recent-sessions")
-async def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db)):
+async def get_recent_sessions(limit: int = 10, start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get recent sessions"""
     try:
-        sessions = db.query(WhatsAppSession).order_by(
-            WhatsAppSession.created_at.desc()
-        ).limit(limit).all()
+        base_query = db.query(WhatsAppSession).order_by(WhatsAppSession.created_at.desc())
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        sessions = filtered_query.limit(limit).all()
         
         return {
             "sessions": [
@@ -265,20 +304,21 @@ async def get_recent_sessions(limit: int = 10, db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/stats/tickets")
-async def get_ticket_stats(db: Session = Depends(get_db)):
+async def get_ticket_stats(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get ticket statistics"""
     try:
-        total_tickets = db.query(WhatsAppSession).filter(
-            WhatsAppSession.ticket_id.isnot(None)
-        ).count()
+        base_tickets = db.query(WhatsAppSession).filter(WhatsAppSession.ticket_id.isnot(None))
+        total_tickets = apply_date_filter(base_tickets, WhatsAppSession, start_date, end_date).count()
         
-        tickets_by_category = db.query(
+        base_cats = db.query(
             WhatsAppSession.problem_category,
             func.count(WhatsAppSession.id).label("count")
         ).filter(
             WhatsAppSession.ticket_id.isnot(None),
             WhatsAppSession.problem_category.isnot(None)
-        ).group_by(
+        )
+        cat_filtered = apply_date_filter(base_cats, WhatsAppSession, start_date, end_date)
+        tickets_by_category = cat_filtered.group_by(
             WhatsAppSession.problem_category
         ).all()
         
@@ -302,15 +342,15 @@ async def get_ticket_stats(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/dashboard")
-async def get_dashboard_data(db: Session = Depends(get_db)):
+async def get_dashboard_data(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get all dashboard data in one call"""
     try:
-        overview = await get_overview_stats(db)
-        categories = await get_category_stats(db)
-        severity = await get_severity_stats(db)
-        quality = await get_quality_metrics(db)
-        tickets = await get_ticket_stats(db)
-        recent = await get_recent_sessions(10, db)
+        overview = await get_overview_stats(start_date, end_date, db)
+        categories = await get_category_stats(start_date, end_date, db)
+        severity = await get_severity_stats(start_date, end_date, db)
+        quality = await get_quality_metrics(start_date, end_date, db)
+        tickets = await get_ticket_stats(start_date, end_date, db)
+        recent = await get_recent_sessions(10, start_date, end_date, db)
         
         return {
             "overview": overview,
@@ -455,15 +495,53 @@ async def get_active_alerts(db: Session = Depends(get_db)):
 
 @router.get("/alerts/health-check")
 async def health_check(db: Session = Depends(get_db)):
-    """Quick health check endpoint"""
+    """Quick health check endpoint with component status"""
     try:
+        import requests as _req
+        from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
+
         alerts = AlertManager.check_system_health(db)
         has_critical = any(a.severity.value == "critical" for a in alerts)
-        
+
+        # ── Component health probes ──
+        # Database
+        try:
+            db.execute(text("SELECT 1"))
+            db_status = "connected"
+        except Exception:
+            db_status = "error"
+
+        # Ollama / AI Engine
+        try:
+            r = _req.get("http://localhost:11434/api/tags", timeout=2)
+            ai_status = "operational" if r.status_code == 200 else "unreachable"
+        except Exception:
+            ai_status = "unreachable"
+
+        # WhatsApp API (check config)
+        import os as _os
+        wa_token = _os.getenv("WHATSAPP_TOKEN") or _os.getenv("VERIFY_TOKEN")
+        wa_status = "configured" if wa_token else "not_configured"
+
+        # osTicket
+        ost_url = _os.getenv("OSTICKET_URL")
+        ost_key = _os.getenv("OSTICKET_API_KEY")
+        ost_status = "configured" if (ost_url and ost_key) else "not_configured"
+
+        # Knowledge Base
+        kb_status = f"loaded_{len(KB_TROUBLESHOOTING)}_categories" if KB_TROUBLESHOOTING else "error"
+
         return {
             "status": "unhealthy" if has_critical else "healthy",
             "alerts_count": len(alerts),
             "critical_alerts": len([a for a in alerts if a.severity.value == "critical"]),
+            "components": {
+                "database": db_status,
+                "ai_engine": ai_status,
+                "whatsapp_api": wa_status,
+                "osticket": ost_status,
+                "knowledge_base": kb_status,
+            },
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
@@ -836,7 +914,7 @@ async def get_overall_score(db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.get("/ml-insights")
-async def get_ml_insights(db: Session = Depends(get_db)):
+async def get_ml_insights(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
     """Get ML-driven insights: top escalations, peak hours, weekly trend, KB rate"""
     try:
         now = datetime.now()
@@ -844,13 +922,15 @@ async def get_ml_insights(db: Session = Depends(get_db)):
         fourteen_days_ago = now - timedelta(days=14)
         
         # --- Top escalated categories ---
-        escalated_categories = db.query(
+        base_escalated = db.query(
             WhatsAppSession.problem_category,
             func.count(WhatsAppSession.id).label("count")
         ).filter(
             WhatsAppSession.ticket_id.isnot(None),
             WhatsAppSession.problem_category.isnot(None)
-        ).group_by(
+        )
+        escalated_filtered = apply_date_filter(base_escalated, WhatsAppSession, start_date, end_date)
+        escalated_categories = escalated_filtered.group_by(
             WhatsAppSession.problem_category
         ).order_by(func.count(WhatsAppSession.id).desc()).limit(5).all()
         
@@ -859,13 +939,17 @@ async def get_ml_insights(db: Session = Depends(get_db)):
             for cat, cnt in escalated_categories
         ]
         
-        # --- Peak hours analysis (last 7 days) ---
-        peak_hours_raw = db.query(
+        # --- Peak hours analysis ---
+        base_peak = db.query(
             func.extract('hour', WhatsAppSession.created_at).label("hour"),
             func.count(WhatsAppSession.id).label("count")
-        ).filter(
-            WhatsAppSession.created_at >= seven_days_ago
-        ).group_by(
+        )
+        if start_date or end_date:
+            peak_filtered = apply_date_filter(base_peak, WhatsAppSession, start_date, end_date)
+        else:
+            peak_filtered = base_peak.filter(WhatsAppSession.created_at >= seven_days_ago)
+            
+        peak_hours_raw = peak_filtered.group_by(
             func.extract('hour', WhatsAppSession.created_at)
         ).order_by(func.count(WhatsAppSession.id).desc()).all()
         
@@ -892,11 +976,11 @@ async def get_ml_insights(db: Session = Depends(get_db)):
             trend_pct = 100.0 if this_week_count > 0 else 0.0
         
         # --- KB effectiveness ---
-        total_sessions = db.query(func.count(WhatsAppSession.id)).scalar() or 0
+        base_sessions = db.query(func.count(WhatsAppSession.id))
+        total_sessions = apply_date_filter(base_sessions, WhatsAppSession, start_date, end_date).scalar() or 0
         
-        tickets_created = db.query(func.count(WhatsAppSession.id)).filter(
-            WhatsAppSession.ticket_id.isnot(None)
-        ).scalar() or 0
+        base_tickets = db.query(func.count(WhatsAppSession.id)).filter(WhatsAppSession.ticket_id.isnot(None))
+        tickets_created = apply_date_filter(base_tickets, WhatsAppSession, start_date, end_date).scalar() or 0
         
         resolved_by_ai = total_sessions - tickets_created
         kb_rate = round((resolved_by_ai / total_sessions * 100), 1) if total_sessions > 0 else 0

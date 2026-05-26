@@ -41,7 +41,7 @@ Modern React-based analytics dashboard for the TRAMOS WhatsApp AI Support System
 
 - Node.js 16+ (for development)
 - npm or yarn
-- Backend API running on `http://localhost:8000`
+- Backend API running on `http://localhost:9999`
 
 ## Installation
 
@@ -80,7 +80,7 @@ The dashboard will be available at `http://localhost:5173`
 2. **Start Backend Server**
    ```bash
    cd /Users/vdr/Documents/TRAMOS
-   uvicorn main:app --host 0.0.0.0 --port 8000
+   uvicorn main:app --host 0.0.0.0 --port 9999
    ```
 
 3. **Install Frontend Dependencies**
@@ -170,9 +170,9 @@ This creates a `dist` folder with optimized production files.
 ## Troubleshooting
 
 ### Connection Refused
-Ensure backend is running on port 8000:
+Ensure backend is running on port 9999:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:9999/health
 ```
 
 ### Login Failed

@@ -58,7 +58,7 @@ Determine SINGLE best intent. Return ONLY valid JSON, no other text:
 {{"intent": "VALUE", "category": null_or_string, "confidence": 0.0-1.0, "tone": "VALUE"}}
 
 INTENT options ONLY: greeting | problem | resolved | unresolved | escalate | feedback | unknown
-CATEGORY options: gps | connectivity | device | vehicle | app | ticket | or null
+CATEGORY options: gps | connectivity | camera | device | vehicle | app | billing | ticket | maintenance | sensor | driver | report | account | or null
 TONE options: urgent | frustrated | neutral | satisfied | seeking_help
 CONFIDENCE: 0.0-1.0 (how sure are you)
 

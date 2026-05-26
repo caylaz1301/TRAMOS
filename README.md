@@ -91,16 +91,16 @@ Optional (for outbound WhatsApp messages):
 
 ```bash
 # Development (with auto-reload)
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 9999
 
 # Production
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:9999
 ```
 
 Access the app:
-- **API**: http://localhost:8000
-- **Swagger Docs**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
+- **API**: http://localhost:9999
+- **Swagger Docs**: http://localhost:9999/api/docs
+- **ReDoc**: http://localhost:9999/api/redoc
 
 ## How It Works
 
@@ -185,13 +185,13 @@ Quick start:
 
 ```bash
 # Test health check
-curl http://localhost:8000/tickets/health
+curl http://localhost:9999/tickets/health
 
 # Test webhook verification
-curl "http://localhost:8000/webhook/whatsapp?hub_mode=subscribe&hub_challenge=TEST&hub_verify_token=tramos_webhook_token_change_me"
+curl "http://localhost:9999/webhook/whatsapp?hub_mode=subscribe&hub_challenge=TEST&hub_verify_token=tramos_webhook_token_change_me"
 
 # Test ticket creation
-curl -X POST http://localhost:8000/tickets \
+curl -X POST http://localhost:9999/tickets \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Test User",
@@ -221,7 +221,7 @@ server {
     ssl_certificate_key /path/to/key;
     
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:9999;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

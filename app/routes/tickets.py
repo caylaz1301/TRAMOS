@@ -87,9 +87,9 @@ async def create_ticket_from_whatsapp(
     # Notify user if ticket was created successfully (async)
     if result.success and whatsapp_service.is_configured():
         notification_text = (
-            f"Thank you! Your support ticket has been created.\n\n"
-            f"Ticket ID: #{result.ticket_id}\n\n"
-            f"Our support team will respond shortly. Please keep this ticket number for reference."
+            f"✅ Tiket support Anda telah berhasil dibuat.\n\n"
+            f"📌 Nomor Tiket: #{result.ticket_id}\n\n"
+            f"Tim support kami akan segera merespons. Simpan nomor tiket ini untuk referensi."
         )
         await whatsapp_service.send_message(phone_number, notification_text)
         logger.info(f"✅ Notified user {phone_number} about ticket {result.ticket_id}")

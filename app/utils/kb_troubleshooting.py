@@ -22,7 +22,11 @@ KB_TROUBLESHOOTING = {
             "gps", "lokasi", "location", "tracking", "posisi", "signal",
             "sinyal", "gps mati", "gps error", "positioning", "peta",
             "map", "koordinat", "navigate", "track", "tidak ketemu",
-            "hilang", "loss"
+            "hilang", "loss", "gps ga akurat", "posisi salah", "titik",
+            "maps", "geolocation", "lat", "lng", "longitude", "latitude",
+            "arah", "heading", "jalur", "rute", "route", "geser",
+            "meleset", "ga muncul", "tidak muncul di peta", "blank map",
+            "tidak terlacak", "ga ketemu lokasinya", "dimana", "ga nyala gps"
         ],
         "description": "Device GPS signal, location accuracy, and real-time tracking issues",
         "symptoms": [
@@ -605,6 +609,193 @@ KB_TROUBLESHOOTING = {
             "technical_difficulty": "high",
             "common_root_causes": ["wiring", "calibration", "hardware_failure", "water_damage"],
             "requires_hardware_access": True,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== DRIVER BEHAVIOR & MANAGEMENT ==========
+    "driver": {
+        "category_id": "driver",
+        "title": "Driver & Perilaku Pengemudi",
+        "keywords": [
+            "driver", "pengemudi", "sopir", "supir", "perilaku", "behavior",
+            "ngebut", "speeding", "harsh", "braking", "rem mendadak",
+            "belok tajam", "cornering", "idle", "diam", "parkir lama",
+            "sim", "lisensi", "licence", "skor", "score", "rating",
+            "pelanggaran", "violation", "fatigue", "ngantuk", "capek",
+            "lelah", "jam kerja", "overtime", "shift", "jadwal driver",
+            "absen", "kehadiran", "attendance", "ibutton", "rfid"
+        ],
+        "description": "Monitoring perilaku pengemudi, skor keselamatan, dan manajemen shift driver",
+        "symptoms": [
+            "Skor driver turun drastis",
+            "Alert speeding terus menerus",
+            "Driver ID tidak terdeteksi",
+            "Jam kerja melebihi batas",
+            "Riwayat pelanggaran tidak muncul",
+        ],
+        "first_response": "Baik, saya bantu terkait manajemen driver dan perilaku pengemudi. Mari kita cek data yang tersedia 🚗",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Cek profil driver di sistem",
+                "instruction": "Buka TRAMOS → Menu Driver → Cari nama driver. Lihat skor keselamatan, jumlah pelanggaran, dan status SIM.",
+                "verification": "Profil driver muncul dengan data lengkap.",
+            },
+            {
+                "step": 2,
+                "title": "Review riwayat pelanggaran",
+                "instruction": "Di profil driver, buka tab 'Pelanggaran'. Filter berdasarkan tanggal. Cek jenis pelanggaran: speeding, harsh braking, idle time berlebihan.",
+                "verification": "Daftar pelanggaran terlihat dengan detail waktu dan lokasi.",
+            },
+            {
+                "step": 3,
+                "title": "Cek konfigurasi alert",
+                "instruction": "Masuk ke Settings → Alert Rules → Driver. Pastikan threshold sudah benar: batas kecepatan, durasi idle, jam kerja maksimal.",
+                "verification": "Alert threshold sesuai dengan kebijakan perusahaan.",
+            },
+            {
+                "step": 4,
+                "title": "Verifikasi device identifikasi driver",
+                "instruction": "Pastikan iButton/RFID driver terdaftar di sistem. Cek di Kendaraan → Driver Assignment → Test scan iButton.",
+                "verification": "Driver ID terdeteksi dan terhubung ke profil yang benar.",
+            },
+        ],
+        "workaround": "Catat pelanggaran secara manual dari laporan harian sambil menunggu konfigurasi sistem diperbaiki.",
+        "escalation_triggers": [
+            "Driver terlibat kecelakaan",
+            "Jam kerja melebihi regulasi (>12 jam)",
+            "Skor keselamatan di bawah 40%",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["config_threshold", "driver_id_unregistered", "device_malfunction"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== REPORT & DATA EXPORT ==========
+    "report": {
+        "category_id": "report",
+        "title": "Laporan & Export Data",
+        "keywords": [
+            "laporan", "report", "export", "download", "unduh", "pdf",
+            "excel", "csv", "print", "cetak", "riwayat", "history",
+            "log", "data", "statistik", "grafik", "chart", "analisis",
+            "ringkasan", "summary", "rekapitulasi", "rekap", "bulanan",
+            "mingguan", "harian", "daily", "weekly", "monthly",
+            "kilometer", "perjalanan", "trip", "journey", "fuel report"
+        ],
+        "description": "Pembuatan laporan, export data, dan analisis riwayat perjalanan",
+        "symptoms": [
+            "Laporan tidak bisa di-download",
+            "Data di laporan tidak akurat",
+            "Export ke Excel gagal",
+            "Grafik tidak muncul",
+            "Filter tanggal tidak berfungsi",
+        ],
+        "first_response": "Saya bantu terkait laporan dan export data. Mari kita cek kebutuhannya 📋",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Pilih jenis laporan",
+                "instruction": "Buka TRAMOS → Menu Laporan. Pilih jenis: Trip Report, Fuel Report, Driver Report, atau Summary Report. Tentukan periode tanggal yang diinginkan.",
+                "verification": "Halaman laporan terbuka dengan filter yang benar.",
+            },
+            {
+                "step": 2,
+                "title": "Generate laporan",
+                "instruction": "Setelah filter diisi, klik 'Generate'. Tunggu proses pengambilan data (bisa 10-30 detik untuk data besar). Jika timeout, perkecil range tanggal.",
+                "verification": "Data laporan muncul di layar dalam format tabel.",
+            },
+            {
+                "step": 3,
+                "title": "Export ke format yang diinginkan",
+                "instruction": "Klik tombol Export → pilih format (PDF, Excel, CSV). Untuk PDF pastikan browser mengizinkan popup. Untuk Excel pastikan ukuran file tidak terlalu besar (<50MB).",
+                "verification": "File berhasil ter-download ke komputer.",
+            },
+            {
+                "step": 4,
+                "title": "Validasi data laporan",
+                "instruction": "Buka file yang sudah di-download. Cross-check beberapa data sample dengan data live di aplikasi. Pastikan kolom dan angka sesuai.",
+                "verification": "Data di file export cocok dengan data di aplikasi.",
+            },
+        ],
+        "workaround": "Screenshot data dari layar atau copy-paste ke spreadsheet secara manual jika export tidak berfungsi.",
+        "escalation_triggers": [
+            "Data hilang dari laporan (gap data >1 jam)",
+            "Server timeout saat generate laporan besar",
+            "Data laporan sangat berbeda dengan kenyataan",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["browser_popup_blocked", "large_data_range", "server_timeout"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== ACCOUNT & ACCESS ==========
+    "account": {
+        "category_id": "account",
+        "title": "Akun & Akses",
+        "keywords": [
+            "login", "password", "kata sandi", "sandi", "akun", "account",
+            "masuk", "daftar", "register", "lupa password", "reset",
+            "ganti password", "profil", "profile", "hak akses", "permission",
+            "role", "admin", "user", "operator", "logout", "keluar",
+            "session", "expired", "kadaluarsa", "token", "otentikasi",
+            "otp", "verifikasi", "email", "aktivasi", "blocked", "diblokir"
+        ],
+        "description": "Manajemen akun pengguna, login, password, dan hak akses",
+        "symptoms": [
+            "Tidak bisa login",
+            "Password lupa",
+            "Akun terkunci/blocked",
+            "Session expired terus",
+            "Tidak punya akses ke fitur tertentu",
+        ],
+        "first_response": "Saya bantu terkait akun dan akses. Mari kita selesaikan masalahnya 🔐",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Verifikasi kredensial login",
+                "instruction": "Pastikan username dan password diketik dengan benar. Cek Caps Lock mati. Username biasanya format: nama.belakang atau email.",
+                "verification": "Login berhasil setelah memasukkan kredensial yang benar.",
+            },
+            {
+                "step": 2,
+                "title": "Reset password",
+                "instruction": "Jika lupa password: Klik 'Lupa Password' di halaman login → masukkan email terdaftar → cek inbox (dan spam folder) → ikuti link reset → buat password baru minimal 8 karakter.",
+                "verification": "Password berhasil di-reset dan bisa login dengan password baru.",
+            },
+            {
+                "step": 3,
+                "title": "Cek status akun",
+                "instruction": "Hubungi admin untuk cek apakah akun masih aktif. Akun bisa di-nonaktifkan jika: terlalu banyak salah login (>5x), masa kontrak habis, atau dihapus admin.",
+                "verification": "Admin mengkonfirmasi status akun aktif.",
+            },
+            {
+                "step": 4,
+                "title": "Periksa hak akses",
+                "instruction": "Jika bisa login tapi fitur terbatas, cek role di profil. Minta admin menambah permission jika diperlukan: Settings → Users → Edit Role.",
+                "verification": "Semua fitur yang dibutuhkan sudah bisa diakses.",
+            },
+        ],
+        "workaround": "Gunakan akun rekan kerja sementara atau hubungi admin langsung via WhatsApp/telepon untuk reset darurat.",
+        "escalation_triggers": [
+            "Akun admin utama terkunci",
+            "Dugaan akses tidak sah (hacking)",
+            "Semua user tidak bisa login (masalah server)",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["forgotten_password", "account_locked", "permission_issue"],
+            "requires_hardware_access": False,
             "data_loss_risk": False,
         },
     },
