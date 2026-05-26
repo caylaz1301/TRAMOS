@@ -1,44 +1,44 @@
 /* ============================================================================
-   TRAMOS Design System — Premium Dark Theme
+   TRAMOS Design System — Clean White Professional Theme
    ============================================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* ── Colors ── */
-  --bg-primary: #0b1120;
-  --bg-secondary: #111827;
-  --bg-card: #1a2332;
-  --bg-card-hover: #1f2b3d;
-  --bg-surface: #243044;
-  --bg-input: #162032;
-  --bg-elevated: #1e2d42;
+  /* ── Colors — Light Professional ── */
+  --bg-primary: #f8f9fb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f3f5f8;
+  --bg-surface: #eef1f6;
+  --bg-input: #f3f5f8;
+  --bg-elevated: #ffffff;
 
-  --text-primary: #f0f4f8;
-  --text-secondary: #8b9bb4;
-  --text-muted: #5a6d84;
-  --text-inverse: #0b1120;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --text-inverse: #ffffff;
 
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
-  --accent-muted: rgba(59, 130, 246, 0.12);
-  --accent-light: rgba(59, 130, 246, 0.25);
+  --accent: #2563eb;
+  --accent-hover: #3b82f6;
+  --accent-muted: rgba(37, 99, 235, 0.08);
+  --accent-light: rgba(37, 99, 235, 0.15);
 
-  --emerald: #10b981;
-  --emerald-muted: rgba(16, 185, 129, 0.12);
-  --amber: #f59e0b;
-  --amber-muted: rgba(245, 158, 11, 0.12);
-  --rose: #ef4444;
-  --rose-muted: rgba(239, 68, 68, 0.12);
-  --violet: #8b5cf6;
-  --violet-muted: rgba(139, 92, 246, 0.12);
-  --sky: #06b6d4;
-  --sky-muted: rgba(6, 182, 212, 0.12);
-  --orange: #f97316;
+  --emerald: #059669;
+  --emerald-muted: rgba(5, 150, 105, 0.08);
+  --amber: #d97706;
+  --amber-muted: rgba(217, 119, 6, 0.08);
+  --rose: #dc2626;
+  --rose-muted: rgba(220, 38, 38, 0.06);
+  --violet: #7c3aed;
+  --violet-muted: rgba(124, 58, 237, 0.08);
+  --sky: #0891b2;
+  --sky-muted: rgba(8, 145, 178, 0.08);
+  --orange: #ea580c;
 
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
-  --divider: rgba(255, 255, 255, 0.04);
+  --border: #e5e7eb;
+  --border-hover: #d1d5db;
+  --divider: #f3f4f6;
 
   /* ── Typography ── */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -53,11 +53,11 @@
   --radius-full: 9999px;
 
   /* ── Shadows ── */
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.25);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.35);
-  --shadow-glow-blue: 0 0 24px rgba(59, 130, 246, 0.2);
-  --shadow-glow-emerald: 0 0 24px rgba(16, 185, 129, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-glow-blue: 0 0 20px rgba(37, 99, 235, 0.15);
+  --shadow-glow-emerald: 0 0 20px rgba(5, 150, 105, 0.12);
 
   /* ── Transitions ── */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
@@ -100,8 +100,8 @@ img { max-width: 100%; }
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-surface); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* ── Animations ── */
 @keyframes fadeUp {
@@ -184,7 +184,7 @@ img { max-width: 100%; }
   gap: 10px;
   padding: 12px 16px;
   background: var(--rose-muted);
-  border: 1px solid rgba(239,68,68,0.2);
+  border: 1px solid rgba(220,38,38,0.15);
   border-radius: var(--radius-sm);
   color: var(--rose);
   font-size: 13px;
@@ -215,11 +215,13 @@ img { max-width: 100%; }
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color var(--t-fast);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  box-shadow: var(--shadow-sm);
 }
 
 .card:hover {
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-md);
 }
 
 .card-header {
@@ -274,4 +276,105 @@ img { max-width: 100%; }
   margin-bottom: 8px;
   display: block;
   opacity: 0.7;
+}
+
+/* ── Logout Confirmation Modal ── */
+.logout-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+.logout-modal {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 32px;
+  width: 360px;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logout-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  background: #fef2f2;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.logout-modal-text {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-logout-cancel {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout-cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.btn-logout-confirm {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-logout-confirm:hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }

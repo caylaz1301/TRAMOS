@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { analyticsService, benchmarkService } from '../api.js';
+import DateFilter from '../components/DateFilter';
 import './InsightsPage.css';
 
 export default function InsightsPage() {
@@ -10,6 +11,7 @@ export default function InsightsPage() {
   const [activityLog, setActivityLog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
 
   const fetchData = async () => {
     try {
@@ -18,8 +20,8 @@ export default function InsightsPage() {
       const [alertsData, healthData, dashData, mlData, logData] = await Promise.all([
         analyticsService.getActiveAlerts().catch(() => null),
         analyticsService.getHealthCheck().catch(() => null),
-        analyticsService.getDashboard().catch(() => null),
-        analyticsService.getMLInsights().catch(() => null),
+        analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
+        analyticsService.getMLInsights(dateRange.startDate, dateRange.endDate).catch(() => null),
         analyticsService.getActivityLog(15).catch(() => null),
       ]);
       setAlerts(alertsData);
@@ -36,7 +38,7 @@ export default function InsightsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   if (loading) {
     return (
@@ -108,6 +110,8 @@ export default function InsightsPage() {
           Perbarui
         </button>
       </div>
+
+      <DateFilter onFilterChange={setDateRange} />
 
       {error && (
         <div className="page-error">⚠️ {error}<button onClick={fetchData}>Coba Lagi</button></div>

@@ -100,6 +100,43 @@ class MetricType(str, Enum):
 # DATABASE MODELS - Production Schema
 # ============================================================================
 
+
+class DashboardUser(Base):
+    """Dashboard user accounts - for login/registration (separate from WhatsApp users)"""
+    __tablename__ = "dashboard_users"
+    __table_args__ = (
+        Index('idx_dash_users_email', 'email'),
+        Index('idx_dash_users_google_id', 'google_id'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(255), unique=True, nullable=False)
+    phone = Column(String(20), nullable=True)
+    full_name = Column(String(150), nullable=False)
+    password_hash = Column(String(255), nullable=True)  # Null for Google-only users
+    
+    # Auth provider
+    auth_provider = Column(String(20), default="email")  # email, google
+    google_id = Column(String(255), unique=True, nullable=True)
+    
+    # OTP verification
+    is_verified = Column(Boolean, default=False)
+    otp_code = Column(String(6), nullable=True)
+    otp_expires_at = Column(DateTime, nullable=True)
+    
+    # Role & status
+    role = Column(String(20), default="user")
+    is_active = Column(Boolean, default=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=True)
+
+    def __repr__(self):
+        return f"<DashboardUser email={self.email} verified={self.is_verified}>"
+
+
 class User(Base):
     """WhatsApp user profile - Core user entity"""
     __tablename__ = "users"

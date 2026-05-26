@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
     # Log service status
     logger.info(f"osTicket: {'✅ Configured' if settings.OSTICKET_API_KEY else '❌ Not configured'}")
     logger.info(f"WhatsApp: {'✅ Configured' if settings.WHATSAPP_API_TOKEN else '❌ Not configured'}")
-    logger.info(f"Ollama AI: ✅ Local (localhost:11434)")
+    logger.info(f"Gemini AI: ✅ {getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')} (Cloud API)")
     logger.info("=" * 50)
     
     yield
@@ -171,11 +171,11 @@ async def health_check():
         db_status = f"error: {str(e)[:30]}"
     health_status["components"]["database"] = db_status
     
-    # Check AI engine (Ollama)
+    # Check AI engine (Gemini)
     ai_status = "unknown"
     try:
         if ai_engine:
-            ai_status = "operational" if ai_engine._check_ollama_connection() else "unreachable"
+            ai_status = "operational" if getattr(ai_engine, 'gemini_available', False) else "not_configured"
     except Exception:
         ai_status = "not_configured"
     health_status["components"]["ai_engine"] = ai_status

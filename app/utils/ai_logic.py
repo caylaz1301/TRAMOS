@@ -1,5 +1,6 @@
-"""AI-based logic for troubleshooting and intent detection - Ollama/Mistral Version (ENHANCED)
+"""AI-based logic for troubleshooting and intent detection - Google Gemini Version (ENHANCED)
 Now with:
+- Google Gemini API (gemini-2.0-flash) replacing Ollama/Mistral
 - Semantic KB matching (instead of keyword-only)
 - User profile personalization
 - Solution effectiveness tracking
@@ -12,73 +13,83 @@ import json
 import requests
 from datetime import datetime
 
+import google.generativeai as genai
+
 from app.config import settings
 from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
 from app.utils.semantic_kb_matcher import SemanticKBMatcher
 from app.utils.user_profile_manager import UserProfileManager
 from app.utils.solution_effectiveness_tracker import SolutionEffectivenessTracker, SolutionOutcome
 from app.utils.smart_prompt_engineer import SmartPromptEngineer
-from app.utils.dialog_flow_engine import AdaptiveDialogFlowEngine, DialogState
+from app.utils.dialog_flow_engine import AdaptiveDialogFlowEngine, AdaptiveDialogState
 
 logger = logging.getLogger(__name__)
 
-# Ollama Configuration
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
-OLLAMA_MODEL = "mistral"
-OLLAMA_TIMEOUT = 30  # seconds
+# ── Ollama Configuration (DISABLED - switched to Gemini) ──
+# OLLAMA_API_URL = "http://localhost:11434/api/generate"
+# OLLAMA_MODEL = "mistral"
+# OLLAMA_TIMEOUT = 30
+
+# ── Google Gemini Configuration ──
+GEMINI_MODEL = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+GEMINI_TIMEOUT = 30  # seconds
 
 
 class AITroubleshootingEngine:
-    """AI-powered troubleshooting with LLM support (Ollama/Mistral - Local) - ENHANCED VERSION
+    """AI-powered troubleshooting with LLM support (Google Gemini API) - ENHANCED VERSION
     
     Now includes:
-    - Semantic KB matching (not keyword-only) ✨ NEW
-    - User profile personalization ✨ NEW
-    - Solution effectiveness tracking ✨ NEW
-    - Smart prompt engineering ✨ NEW
-    - Adaptive dialog flow ✨ NEW
+    - Google Gemini 2.0 Flash as LLM backend ✨ UPDATED
+    - Semantic KB matching (not keyword-only) ✨
+    - User profile personalization ✨
+    - Solution effectiveness tracking ✨
+    - Smart prompt engineering ✨
+    - Adaptive dialog flow ✨
     """
     
     def __init__(self):
-        """Initialize AI engine with all enhancements"""
+        """Initialize AI engine with Gemini and all enhancements"""
         self.use_llm = settings.USE_LLM
-        self.ollama_available = self._check_ollama_connection()
         self.fallback_count = 0
         
-        # ✨ NEW: Initialize semantic matcher
+        # ── Configure Gemini API ──
+        gemini_api_key = getattr(settings, 'GEMINI_API_KEY', '')
+        self.gemini_available = False
+        if gemini_api_key:
+            try:
+                genai.configure(api_key=gemini_api_key)
+                self.gemini_client = genai.GenerativeModel(GEMINI_MODEL)
+                self.gemini_available = True
+                logger.info(f"✅ Google Gemini API initialized: {GEMINI_MODEL}")
+            except Exception as e:
+                logger.error(f"❌ Gemini init failed: {e}")
+                self.gemini_client = None
+        else:
+            self.gemini_client = None
+            logger.warning("⚠️ GEMINI_API_KEY not set. Falling back to keyword matching.")
+        
+        # ✨ Initialize semantic matcher
         self.semantic_matcher = SemanticKBMatcher()
         
-        # ✨ NEW: Initialize user profile manager
+        # ✨ Initialize user profile manager
         self.user_profile_manager = UserProfileManager()
         
-        # ✨ NEW: Initialize solution effectiveness tracker
+        # ✨ Initialize solution effectiveness tracker
         self.solution_tracker = SolutionEffectivenessTracker()
         
-        # ✨ NEW: Initialize smart prompt engineer
+        # ✨ Initialize smart prompt engineer
         self.prompt_engineer = SmartPromptEngineer()
         
-        # ✨ NEW: Initialize dialog flow engine
+        # ✨ Initialize dialog flow engine
         self.dialog_flow = AdaptiveDialogFlowEngine(self.semantic_matcher)
         
-        if self.use_llm and self.ollama_available:
-            logger.info(f"✅ Ollama/Mistral LLM initialized (local): {OLLAMA_MODEL}")
-            logger.info("✅ With semantic matching, user profiling, and adaptive dialog flow")
+        if self.use_llm and self.gemini_available:
+            logger.info("✅ Gemini LLM ready with semantic matching, user profiling, and adaptive dialog flow")
         elif self.use_llm:
-            logger.warning("⚠️ Ollama not running. Falling back to keyword matching.")
-            logger.warning("   Start Ollama with: ollama serve")
+            logger.warning("⚠️ Gemini unavailable. Falling back to keyword matching.")
             self.use_llm = False
     
-    def _check_ollama_connection(self) -> bool:
-        """Check if Ollama server is running"""
-        try:
-            response = requests.get(
-                "http://localhost:11434/api/tags",
-                timeout=3
-            )
-            return response.status_code == 200
-        except Exception as e:
-            logger.debug(f"Ollama connection check failed: {e}")
-            return False
+    # ── _check_ollama_connection removed (Ollama disabled, using Gemini) ──
     
     # Knowledge base categories derived from KB_TROUBLESHOOTING (single source of truth)
     @property
@@ -89,8 +100,8 @@ class AITroubleshootingEngine:
     def KB_KEYWORDS(self):
         return {cat: data.get("keywords", []) for cat, data in KB_TROUBLESHOOTING.items()}
     
-    def _detect_intent_with_ollama(self, message: str, context: Optional[str] = None) -> Tuple[str, Optional[str], Dict[str, Any]]:
-        """Use Ollama/Mistral to detect intent - ENHANCED & ROBUST VERSION"""
+    def _detect_intent_with_gemini(self, message: str, context: Optional[str] = None) -> Tuple[str, Optional[str], Dict[str, Any]]:
+        """Use Google Gemini API to detect intent - replaces Ollama"""
         try:
             context_section = f"\n\nPrevious context: {context}" if context else ""
             
@@ -103,45 +114,39 @@ IMPORTANT: Return ONLY VALID JSON (no markdown, no extra text, no explanation):
 {{"intent": "value", "category": null_or_string, "confidence": 0.0-1.0, "tone": "value"}}
 
 Intent must be ONE of: greeting, problem, resolved, unresolved, escalate, feedback, unknown
-Category must be ONE of: gps, connectivity, device, vehicle, app, ticket, or null (if unknown)
+Category must be ONE of: gps, connectivity, camera, device, vehicle, app, billing, ticket, maintenance, sensor, driver, report, account, or null (if unknown)
 Tone must be ONE of: urgent, frustrated, neutral, satisfied, seeking_help
 
 If the message mentions:
-- GPS, location, tracking, signal, lokasi, sinyal → category: "gps"
-- Internet, connection, network, offline, koneksi → category: "connectivity"  
-- Device, crash, freeze, camera → category: "device"
-- Vehicle, mogok, breakdown, stall → category: "vehicle"
-- App, aplikasi, software → category: "app"
-- Ticket, tiket, support → category: "ticket"
+- GPS, location, tracking, signal, lokasi, sinyal, peta → category: "gps"
+- Internet, connection, network, offline, koneksi, lambat → category: "connectivity"
+- Kamera, video, rekam, dashcam → category: "camera"
+- Device, hardware, perangkat, restart, mati → category: "device"
+- Vehicle, kendaraan, mogok, mesin, mobil → category: "vehicle"
+- App, aplikasi, software, crash, update → category: "app"
+- Billing, tagihan, biaya, invoice, bayar → category: "billing"
+- Ticket, tiket, support, bantuan → category: "ticket"
+- Maintenance, perawatan, servis, oli → category: "maintenance"
+- Sensor, fuel, suhu, geofence, alarm → category: "sensor"
+- Driver, sopir, pengemudi, speeding, pelanggaran → category: "driver"
+- Laporan, report, export, download, riwayat → category: "report"
+- Login, password, akun, lupa password, hak akses → category: "account"
 - Or if category unclear → category: null
 
 RESPOND WITH ONLY JSON, NOTHING ELSE."""
 
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.1,  # Even lower for consistency
-                    "top_p": 0.9,
-                    "top_k": 30,
-                    "num_predict": 100,
-                    "repeat_penalty": 1.1,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,
+                    max_output_tokens=150,
+                )
             )
+            response_text = gemini_response.text.strip()
             
-            if response.status_code != 200:
-                logger.error(f"❌ Ollama API error: {response.status_code}")
-                return ("unknown", None, {"source": "ollama_error", "error": f"HTTP {response.status_code}"})
-            
-            response_data = response.json()
-            response_text = response_data.get("response", "").strip()
-            
-            # Clean up response
-            response_text = response_text.replace("```json", "").replace("```", "")
-            response_text = response_text.strip()
+            # Clean up response (remove markdown code fences if any)
+            response_text = response_text.replace("```json", "").replace("```", "").strip()
             
             # Parse JSON
             try:
@@ -159,27 +164,21 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
                 if intent not in ["greeting", "problem", "resolved", "unresolved", "escalate", "feedback", "unknown"]:
                     intent = "unknown"
                 
-                logger.debug(f"🧠 Ollama: intent={intent}, category={category}, conf={confidence:.1%}")
+                logger.debug(f"🧠 Gemini: intent={intent}, category={category}, conf={confidence:.1%}")
                 
                 return (intent, category, {
-                    "source": "ollama",
+                    "source": "gemini",
                     "confidence": confidence,
                     "tone": tone,
                 })
                 
             except json.JSONDecodeError as e:
-                logger.error(f"❌ JSON parse failed: {str(e)[:50]}")
+                logger.error(f"❌ Gemini JSON parse failed: {str(e)[:50]}")
                 return ("unknown", None, {"source": "parse_error"})
             
-        except requests.exceptions.Timeout:
-            logger.error("⏱️ Ollama request timeout")
-            return ("unknown", None, {"source": "timeout"})
-        except requests.exceptions.ConnectionError:
-            logger.error("❌ Ollama connection failed")
-            return ("unknown", None, {"source": "connection_error"})
         except Exception as e:
-            logger.error(f"❌ Ollama error: {str(e)[:100]}")
-            return ("unknown", None, {"source": "unknown_error"})
+            logger.error(f"❌ Gemini error: {str(e)[:100]}")
+            return ("unknown", None, {"source": "gemini_error"})
     
     def detect_intent(self, message: str, context: Optional[str] = None, phone_number: Optional[str] = None) -> Tuple[str, Optional[str], Dict[str, Any]]:
         """
@@ -198,9 +197,9 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
         else:
             user_profile = None
         
-        # Try LLM first if available
-        if self.use_llm and self.ollama_available:
-            # ✨ NEW: Use smart prompt engineer to generate better intent detection prompt
+        # Try Gemini LLM first if available
+        if self.use_llm and self.gemini_available:
+            # ✨ Use smart prompt engineer to generate better intent detection prompt
             prompt = self.prompt_engineer.generate_intent_detection_prompt(
                 message=message,
                 context_history=[context] if context else [],
@@ -216,7 +215,7 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
             confidence = metadata.get("confidence", 0)
             if isinstance(confidence, (int, float)) and confidence >= settings.AI_CONFIDENCE_THRESHOLD:
                 if phone_number:
-                    logger.info(f"🧠 Intent detected (smart): {intent} ({confidence:.0%})")
+                    logger.info(f"🧠 Intent detected (Gemini): {intent} ({confidence:.0%})")
                 return (intent, category, metadata)
             elif isinstance(confidence, (int, float)):
                 logger.debug(f"⚠️ Low confidence ({confidence:.1%}), using keywords")
@@ -227,29 +226,17 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
         return (intent, category, {"source": "keywords", "confidence": 0.6})
     
     def _detect_intent_with_custom_prompt(self, prompt: str, user_profile: Optional[Any]) -> Tuple[str, Optional[str], Dict[str, Any]]:
-        """Execute intent detection with custom prompt (from smart_prompt_engineer)"""
+        """Execute intent detection with custom prompt via Gemini API"""
         try:
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.1,
-                    "top_p": 0.9,
-                    "top_k": 30,
-                    "num_predict": 100,
-                    "repeat_penalty": 1.1,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.1,
+                    max_output_tokens=150,
+                )
             )
-            
-            if response.status_code != 200:
-                logger.error(f"❌ Ollama API error: {response.status_code}")
-                return ("unknown", None, {"source": "ollama_error", "error": f"HTTP {response.status_code}"})
-            
-            response_data = response.json()
-            response_text = response_data.get("response", "").strip()
+            response_text = gemini_response.text.strip()
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             
             try:
@@ -267,25 +254,28 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
                     intent = "unknown"
                 
                 return (intent, category, {
-                    "source": "ollama_smart",
+                    "source": "gemini_smart",
                     "confidence": confidence,
                     "tone": tone,
                 })
                 
             except json.JSONDecodeError as e:
-                logger.error(f"❌ JSON parse failed: {str(e)[:50]}")
+                logger.error(f"❌ Gemini JSON parse failed: {str(e)[:50]}")
                 return ("unknown", None, {"source": "parse_error"})
             
         except Exception as e:
-            logger.error(f"❌ Intent detection error: {str(e)[:100]}")
-            return ("unknown", None, {"source": "error", "error": str(e)[:50]})
+            logger.error(f"❌ Gemini intent detection error: {str(e)[:100]}")
+            return ("unknown", None, {"source": "gemini_error", "error": str(e)[:50]})
     
     def _detect_intent_with_keywords(self, message: str) -> Tuple[str, Optional[str]]:
         """Fallback: Keyword-based intent detection"""
         message_lower = message.lower()
         
         # Check for greeting
-        if any(w in message_lower for w in ["halo", "pagi", "siang", "hi", "hello", "hei"]):
+        if any(w in message_lower for w in [
+            "halo", "pagi", "siang", "sore", "malam", "hi", "hello", "hei",
+            "selamat", "assalamualaikum", "permisi", "mohon bantuan", "hey"
+        ]):
             return ("greeting", None)
         
         # Check for problem category FIRST (before checking resolution)
@@ -294,14 +284,23 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
                 return ("problem", issue_key)
         
         # Check resolution
-        if any(w in message_lower for w in ["ya", "yes", "ok", "sudah", "jadi", "berhasil", "fixed", "worked"]):
+        if any(w in message_lower for w in [
+            "ya", "yes", "ok", "sudah", "jadi", "berhasil", "fixed", "worked",
+            "bisa", "udah bisa", "solved", "selesai", "mantap", "oke", "sip"
+        ]):
             return ("resolved", None)
         
-        if any(w in message_lower for w in ["tidak", "no", "gak", "nggak", "belum", "tetap", "masih error"]):
+        if any(w in message_lower for w in [
+            "tidak", "no", "gak", "nggak", "belum", "tetap", "masih error",
+            "gagal", "ga bisa", "gak bisa", "masih", "belum bisa", "sama aja"
+        ]):
             return ("unresolved", None)
         
         # Check escalation need
-        if any(w in message_lower for w in ["urgent", "critical", "asap", "bantu", "help", "emergency"]):
+        if any(w in message_lower for w in [
+            "urgent", "critical", "asap", "bantu", "help", "emergency",
+            "darurat", "tolong", "butuh bantuan", "hubungi teknisi"
+        ]):
             return ("escalate", None)
         
         return ("unknown", None)
@@ -311,7 +310,7 @@ RESPOND WITH ONLY JSON, NOTHING ELSE."""
         Deep analyze the user's SPECIFIC problem context using AI
         Returns detailed understanding of the actual issue
         """
-        if not self.use_llm or not self.ollama_available:
+        if not self.use_llm or not self.gemini_available:
             return {"status": "no_ai", "error": "AI not available"}
         
         try:
@@ -333,25 +332,15 @@ Return ONLY valid JSON (no markdown, no extra text):
 
 Be precise. Don't hallucinate. If unsure, say so in the output."""
 
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.2,  # Low temperature for factual analysis
-                    "top_p": 0.85,
-                    "top_k": 25,
-                    "num_predict": 400,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=400,
+                )
             )
-            
-            if response.status_code != 200:
-                logger.warning(f"Problem context analysis failed: {response.status_code}")
-                return {"status": "api_error"}
-            
-            response_text = response.json().get("response", "").strip()
+            response_text = gemini_response.text.strip()
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             
             try:
@@ -400,7 +389,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                 "semantic_match_score": match_score,
                 "kb_solutions": kb_solutions[:3],  # Top 3 alternatives
                 "skill_level": user_profile.skill_level.value if user_profile else "intermediate",
-                "frustration_level": user_profile.frustration_level if user_profile else 0.0,
+                "frustration_level": (min(1.0, (user_profile.frustration_indicators or 0) / 5.0) if user_profile else 0.0),
             }
             
             # ✨ NEW: Use smart prompt engineer to generate better troubleshooting prompt
@@ -424,25 +413,15 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                 previous_attempts=[]
             )
             
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.25,
-                    "top_p": 0.85,
-                    "top_k": 30,
-                    "num_predict": 600,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.25,
+                    max_output_tokens=600,
+                )
             )
-            
-            if response.status_code != 200:
-                logger.warning(f"Troubleshooting generation failed: {response.status_code}")
-                return {"status": "api_error", "steps": []}
-            
-            response_text = response.json().get("response", "").strip()
+            response_text = gemini_response.text.strip()
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             
             try:
@@ -458,7 +437,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                         solution_steps=result.get("steps", []),
                         kb_match_score=match_score,
                         user_skill_level=user_profile.skill_level.value if user_profile else "intermediate",
-                        user_frustration=user_profile.frustration_level if user_profile else 0.0,
+                        user_frustration=(min(1.0, (user_profile.frustration_indicators or 0) / 5.0) if user_profile else 0.0),
                         ai_confidence=result.get("ai_confidence", 0.5)
                     )
                 
@@ -495,25 +474,15 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
         )
         
         try:
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.2,
-                    "top_p": 0.85,
-                    "top_k": 25,
-                    "num_predict": 400,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.2,
+                    max_output_tokens=400,
+                )
             )
-            
-            if response.status_code != 200:
-                logger.warning(f"Problem analysis failed: {response.status_code}")
-                return {"status": "api_error"}
-            
-            response_text = response.json().get("response", "").strip()
+            response_text = gemini_response.text.strip()
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             
             try:
@@ -570,7 +539,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
             if phone_number:
                 user_profile = self.user_profile_manager.get_or_create_profile(phone_number)
             
-            if not self.use_llm or not self.ollama_available:
+            if not self.use_llm or not self.gemini_available:
                 return self._get_fallback_response(intent, category, user_profile)
             
             # ✨ NEW: Use smart prompt engineer to generate response prompt
@@ -583,22 +552,16 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
                 conversation_context={"tone": tone}
             )
             
-            response = requests.post(
-                OLLAMA_API_URL,
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.6,
-                    "top_p": 0.95,
-                    "num_predict": 200,
-                },
-                timeout=OLLAMA_TIMEOUT
+            # ── Call Gemini API ──
+            gemini_response = self.gemini_client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.6,
+                    max_output_tokens=200,
+                )
             )
-            
-            if response.status_code == 200:
-                response_text = response.json().get("response", "").strip()
-                if response_text and len(response_text) > 10:
+            response_text = gemini_response.text.strip()
+            if response_text and len(response_text) > 10:
                     response_text = response_text[:500].strip()
                     response_text = response_text.replace("```", "").strip()
                     

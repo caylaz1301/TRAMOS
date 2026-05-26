@@ -58,19 +58,35 @@ def get_shared_model(model_name: str = 'sentence-transformers/all-MiniLM-L6-v2',
 
 
 class _MockSentenceTransformer:
-    """Fallback mock model for offline development"""
+    """Fallback mock model using TF-IDF-like word-based embeddings for offline development.
+    Produces deterministic, content-aware embeddings so cosine similarity
+    reflects actual keyword overlap instead of random noise."""
+    
+    _VOCAB_DIM = 384  # Same dimension as MiniLM
+    _word_to_idx: dict = {}  # Shared word→dimension mapping
     
     def encode(self, texts, convert_to_numpy=False):
-        """Generate dummy embeddings based on text hash"""
+        """Generate embeddings based on word frequencies (TF-style)"""
         if isinstance(texts, str):
             texts = [texts]
         
         embeddings = []
         for text in texts:
-            # Generate consistent embedding based on text hash
-            hash_val = hash(text) % 2**32
-            np.random.seed(hash_val)
-            embedding = np.random.randn(384)  # Same dimension as MiniLM
+            words = text.lower().split()
+            embedding = np.zeros(self._VOCAB_DIM)
+            
+            for word in words:
+                # Map each unique word to a stable dimension index
+                if word not in self._word_to_idx:
+                    self._word_to_idx[word] = hash(word) % self._VOCAB_DIM
+                idx = self._word_to_idx[word]
+                embedding[idx] += 1.0
+            
+            # L2 normalize so cosine similarity works correctly
+            norm = np.linalg.norm(embedding)
+            if norm > 0:
+                embedding = embedding / norm
+            
             embeddings.append(embedding)
         
         if convert_to_numpy:

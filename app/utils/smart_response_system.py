@@ -534,10 +534,15 @@ class SmartResponseSystem:
         # Clean message
         message = message.strip()
         
-        # Ensure length is reasonable (WhatsApp has soft limits)
-        if len(message) > 1000:
+        # WhatsApp Cloud API text bodies support messages up to 4096 chars.
+        # Keep a little headroom and avoid cutting troubleshooting steps mid-line.
+        max_length = 3900
+        if len(message) > max_length:
             self.logger.warning(f"Message too long ({len(message)} chars), truncating")
-            message = message[:997] + "..."
+            cutoff = message.rfind("\n", 0, max_length - 3)
+            if cutoff < max_length // 2:
+                cutoff = max_length - 3
+            message = message[:cutoff].rstrip() + "\n..."
         
         # Add footer if requested
         if add_footer and message_type != MessageType.CONFIRMATION:

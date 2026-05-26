@@ -35,10 +35,17 @@ class SolutionEffectivenessTracker:
         self,
         solution_id: str,
         category: str,
-        user_phone: str,
-        solution_description: str,
+        user_phone: str = "",
+        solution_description: str = "",
         user_attempt_count: int = 1,
-        resolution_time_minutes: int = 0
+        resolution_time_minutes: int = 0,
+        # Extended parameters (used by ai_logic.py)
+        problem_description: str = "",
+        solution_steps: Optional[List] = None,
+        kb_match_score: Optional[float] = None,
+        user_skill_level: str = "intermediate",
+        user_frustration: float = 0.0,
+        ai_confidence: float = 0.5,
     ) -> Dict:
         """
         Log that we've provided a solution to a user.
@@ -50,19 +57,32 @@ class SolutionEffectivenessTracker:
             solution_description: What was the solution about
             user_attempt_count: How many attempts user has made
             resolution_time_minutes: How long user has been troubleshooting
+            problem_description: Original problem text (from AI caller)
+            solution_steps: List of troubleshooting steps provided
+            kb_match_score: KB semantic match confidence (0-1)
+            user_skill_level: User's technical skill level
+            user_frustration: User frustration level (0-1)
+            ai_confidence: AI confidence in the solution (0-1)
         
         Returns:
             Attempt record
         """
+        description = solution_description or problem_description or "No description"
+        
         attempt = {
             'attempt_id': f"{solution_id}_{user_phone}_{datetime.utcnow().timestamp()}",
             'solution_id': solution_id,
             'category': category,
             'user_phone': user_phone,
-            'solution_description': solution_description,
+            'solution_description': description,
             'provided_at': datetime.utcnow().isoformat(),
             'user_attempt_count': user_attempt_count,
             'resolution_time_minutes': resolution_time_minutes,
+            'kb_match_score': kb_match_score,
+            'ai_confidence': ai_confidence,
+            'user_skill_level': user_skill_level,
+            'user_frustration': user_frustration,
+            'solution_steps_count': len(solution_steps) if solution_steps else 0,
             'outcome': None,  # Will be set later
             'outcome_recorded_at': None,
         }

@@ -20,6 +20,7 @@ from app.services.chatbot.session_manager import DialogState
 from app.services.chatbot.dialog_flow_handler import DialogFlowHandler
 from app.services.chatbot.smart_dialog_flow import SmartDialogFlowHandler
 from app.services.chatbot.nlp_extractor import problem_extractor
+from app.utils.smart_response_system import smart_response_system
 from app.schemas.ticket import CreateTicketRequest
 from app.services.database_tracker import db_tracker
 
@@ -32,6 +33,7 @@ router = APIRouter(prefix="", tags=["whatsapp"])
 # ============================================================================
 _processed_message_ids: dict = {}  # {message_id: timestamp}
 _DEDUP_WINDOW = 30  # seconds to keep message IDs
+_DEDUP_MAX_SIZE = 1000  # max entries to prevent memory leak
 
 def _is_duplicate_message(message_id: str) -> bool:
     """Check if this message was already processed (Meta duplicate webhook)"""
@@ -42,6 +44,12 @@ def _is_duplicate_message(message_id: str) -> bool:
     expired = [mid for mid, ts in _processed_message_ids.items() if now - ts > _DEDUP_WINDOW]
     for mid in expired:
         del _processed_message_ids[mid]
+    
+    # Hard cap: evict oldest entries if dict is too large (prevents memory leak)
+    if len(_processed_message_ids) >= _DEDUP_MAX_SIZE:
+        sorted_ids = sorted(_processed_message_ids.items(), key=lambda x: x[1])
+        for mid, _ in sorted_ids[:len(sorted_ids) // 2]:  # Remove oldest 50%
+            del _processed_message_ids[mid]
     
     if message_id in _processed_message_ids:
         logger.warning(f"⚠️ Duplicate message detected: {message_id}, skipping")
@@ -55,6 +63,25 @@ def get_session_manager():
     """Get the globally initialized session manager"""
     return sm_module.session_manager
 
+
+def _track_turn(session, phone_number: str, message_body: str, response: str,
+                state_value: str, intent: str, category: str = None,
+                turn_start: float = None):
+    """Helper to track a conversation turn in the database.
+    Eliminates repetitive 8-line DB tracking blocks from every state handler.
+    """
+    if not getattr(session, '_db_conversation_id', None):
+        return
+    try:
+        import time as _time
+        _ms = int((_time.time() - turn_start) * 1000) if turn_start else 0
+        db_tracker.track_full_turn(
+            phone_number, message_body, response,
+            session._db_conversation_id, session.message_count, state_value,
+            intent=intent, category=category, processing_time_ms=_ms
+        )
+    except Exception as e:
+        logger.warning(f"⚠️ DB tracking error (non-fatal): {e}")
 
 
 
@@ -112,8 +139,45 @@ async def handle_incoming_message(request: Request) -> Response:
         changes = entry.get("changes", [{}])[0]
         value = changes.get("value", {})
         
+        statuses = value.get("statuses", [])
+        if statuses:
+            for status in statuses:
+                message_id = status.get("id", "unknown")
+                recipient_id = status.get("recipient_id", "unknown")
+                status_name = status.get("status", "unknown")
+                errors = status.get("errors", [])
+
+                if errors:
+                    for error in errors:
+                        logger.warning(
+                            "⚠️ WhatsApp delivery status: %s message_id=%s recipient=%s error_code=%s title=%s detail=%s",
+                            status_name,
+                            message_id,
+                            recipient_id,
+                            error.get("code", "unknown"),
+                            error.get("title", "unknown"),
+                            error.get("error_data", {}).get("details", error.get("message", "")),
+                        )
+                else:
+                    logger.info(
+                        "📬 WhatsApp delivery status: %s message_id=%s recipient=%s",
+                        status_name,
+                        message_id,
+                        recipient_id,
+                    )
+
+            return Response(
+                content=json.dumps({"status": "ok", "event": "statuses"}),
+                media_type="application/json",
+                status_code=200,
+            )
+
         messages = value.get("messages", [])
         if not messages:
+            logger.info(
+                "ℹ️ WhatsApp webhook event with no messages/statuses: keys=%s",
+                sorted(value.keys()),
+            )
             return Response(
                 content=json.dumps({"status": "ok"}), 
                 media_type="application/json"
@@ -276,6 +340,28 @@ async def process_message_with_ai(
     
     elif session.current_state == DialogState.COLLECTING_PROBLEM:
         # Collect problem description + extract category
+        problem_text = message_body.strip()
+        ack_only = problem_text.lower() in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS
+        if len(problem_text) < 5 or ack_only:
+            session.add_message(sender="user", message=message_body, intent="clarification", category=None)
+            response = (
+                "Saya belum menangkap detail masalahnya.\n\n"
+                "Tolong ceritakan kendala yang dialami driver/unit, misalnya:\n"
+                "- GPS tidak update lokasi\n"
+                "- Kamera mati atau layar hitam\n"
+                "- Kendaraan mogok di jalan\n"
+                "- Aplikasi error saat dipakai"
+            )
+            response = smart_response_system.format_for_whatsapp(response)
+            session.add_message(sender="bot", message=response, intent="clarification", category=None)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, session.current_state.value,
+                    intent="clarification", processing_time_ms=_ms)
+            return response
+
         session.problem_description = message_body.strip()
         session.add_message(sender="user", message=message_body, intent="data_collection", category=None)
         
@@ -477,6 +563,19 @@ async def process_message_with_ai(
                     intent="confirmation", category=session.problem_category, processing_time_ms=_ms)
             return response
     
+    elif session.current_state == DialogState.CREATING_TICKET:
+        # Ticket creation in progress — user sent another message while waiting
+        session.add_message(sender="user", message=message_body, intent="waiting", category=session.problem_category)
+        response = "Tiket Anda sedang dalam proses pembuatan. Mohon tunggu sebentar... ⏳"
+        session.add_message(sender="bot", message=response, intent="waiting", category=session.problem_category)
+        get_session_manager().save_session(session)
+        if session._db_conversation_id:
+            _ms = int((_time.time() - _turn_start) * 1000)
+            db_tracker.track_full_turn(phone_number, message_body, response,
+                session._db_conversation_id, session.message_count, "creating_ticket",
+                intent="waiting", category=session.problem_category, processing_time_ms=_ms)
+        return response
+    
     elif session.current_state == DialogState.CLOSED or session.current_state == DialogState.RESOLVED:
         # Close old conversation in DB before starting a new one
         old_conv_id = getattr(session, '_db_conversation_id', None)
@@ -503,8 +602,9 @@ async def process_message_with_ai(
                     intent="greeting", processing_time_ms=_ms)
         return response
     
-    # Fallback - shouldn't reach here
-    return "Terjadi kesalahan. Silakan mulai percakapan baru dengan mengirim 'halo'."
+    # Fallback - shouldn't reach here normally
+    logger.warning(f"⚠️ Unexpected state: {session.current_state.value} for {phone_number}")
+    return "Maaf, terjadi kesalahan. Kirim 'halo' untuk memulai percakapan baru. 🙏"
 
 
 async def _create_ticket_from_session(session, phone_number: str, user_name: str) -> str:
@@ -587,6 +687,7 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
         
         if result.success:
             session.ticket_id = result.ticket_id
+            session.ticket_created = True
             session.current_state = DialogState.CLOSED
             
             response = (
@@ -684,6 +785,3 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
             f"❌ Terjadi kesalahan saat membuat tiket.\n\n"
             f"Silakan coba lagi atau hubungi support."
         )
-
-
-

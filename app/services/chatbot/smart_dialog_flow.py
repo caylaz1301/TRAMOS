@@ -74,6 +74,22 @@ class SmartDialogFlowHandler:
             "follow_up": ["Email benar?", "Password benar?", "2FA aktif?"],
         }
     }
+
+    CATEGORY_LABELS = {
+        "gps": "GPS",
+        "connectivity": "Connectivity",
+        "camera": "Camera",
+        "device": "Device",
+        "vehicle": "Vehicle",
+        "app": "Application",
+        "billing": "Billing",
+        "ticket": "Ticket",
+        "maintenance": "Maintenance",
+        "sensor": "Sensor",
+        "driver": "Driver",
+        "report": "Report",
+        "account": "Account",
+    }
     
     # Enhanced acknowledgment patterns for better context understanding
     # These are used to detect when user just acknowledges without giving actual feedback
@@ -96,6 +112,19 @@ class SmartDialogFlowHandler:
         'masih ada', 'ada lagi', 'tetap', 'belom', 'tdk', 'nope', 'nah', 'engga',
         'aja', 'benci', 'jangan', 'skip', 'tidak bisa', 'gabisa', 'enggak bisa'
     }
+
+    @staticmethod
+    def _contains_keyword(text: str, keywords: List[str]) -> bool:
+        """Match keywords as words/phrases, not arbitrary substrings.
+
+        This prevents false matches such as "no" inside "normal" or "ya"
+        inside "saya", while still allowing phrases like "tidak bisa".
+        """
+        normalized = re.sub(r'\s+', ' ', text.lower()).strip()
+        return any(
+            re.search(rf'(?<!\w){re.escape(keyword.lower())}(?!\w)', normalized)
+            for keyword in keywords
+        )
     
     @staticmethod
     def analyze_problem(problem_description: str) -> Dict[str, Any]:
@@ -375,6 +404,12 @@ class SmartDialogFlowHandler:
         
         session.kb_solution = solutions[0]
         session.tried_kb_solution = True
+        matched_category = solutions[0].get("category")
+        if matched_category:
+            session.problem_category = SmartDialogFlowHandler.CATEGORY_LABELS.get(
+                matched_category,
+                matched_category.replace("_", " ").title(),
+            )
         confidence = solutions[0].get("confidence", 0)
         
         logger.info(f"✓ KB match: {solutions[0]['category']} ({confidence:.0%})")
@@ -422,7 +457,7 @@ class SmartDialogFlowHandler:
     
     @staticmethod
     def _handle_solution_feedback(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
-        """Smart feedback handling"""
+        """Smart feedback handling — uses keyword search in full sentence, not exact match"""
         if not user_message:
             return (
                 smart_response_system.format_question(
@@ -431,34 +466,54 @@ class SmartDialogFlowHandler:
                 ),
                 DialogState.ASKING_SOLUTION_WORKED
             )
-        
+
         answer = user_message.lower().strip()
-        
-        # Clean up input (remove punctuation)
         answer_clean = re.sub(r'[!?.,;:]', '', answer).strip()
-        
-        # Special handling: if user just says acknowledgment without feedback context
-        # Don't process as solution feedback, ask again with clearer framing
+
+        # Short acknowledgements are not proof that the issue is fixed.
+        # Ask once more so "oke/siap/lanjut" does not close the case too early.
         if answer_clean in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS:
             return (
                 smart_response_system.format_question(
-                    "Jadi - apakah solusi yang saya kasih tadi sudah berhasil memperbaiki masalahmu?",
-                    ["✅ Ya, sudah!", "❌ Tidak, masih error"]
+                    "Siap. Setelah dicoba, apakah masalahnya sudah benar-benar berhasil diperbaiki?",
+                    ["Ya, berhasil", "Tidak, masih error"]
                 ),
                 DialogState.ASKING_SOLUTION_WORKED
             )
-        
-        if answer_clean in SmartDialogFlowHandler.POSITIVE_RESPONSES:
+
+        # ── Positive keywords — check if ANY appear in the full answer ──
+        POSITIVE_KW = [
+            'ya', 'yes', 'iya', 'ok', 'oke', 'okeh', 'okay', 'berhasil',
+            'solved', 'fixed', 'worked', 'bisa', 'udah bisa', 'sudah bisa',
+            'jadi', 'mantap', 'makasih', 'terima kasih', 'bagus', 'done',
+            'selesai', 'normal', 'sudah', 'alhamdulillah', 'sukses', 'fix'
+        ]
+        # ── Negative keywords ──
+        NEGATIVE_KW = [
+            'tidak berhasil', 'tidak bisa', 'ga bisa', 'gak bisa', 'gabisa',
+            'masih error', 'masih sama', 'masih bermasalah', 'masih tidak',
+            'belum berhasil', 'belum bisa', 'belum fix', 'belum solved',
+            'gagal', 'tetap error', 'tetap sama', 'tetap tidak', 'tidak jalan',
+            'tidak', 'nggak', 'enggak', 'engga', 'gak', 'ga', 'no', 'nope',
+            'masih', 'belum', 'error', 'salah', 'tidak ada perubahan'
+        ]
+
+        # Check negative FIRST (more specific) to avoid false positives like
+        # "tidak berhasil" matching the "ya" in "saya" etc.
+        is_negative = SmartDialogFlowHandler._contains_keyword(answer, NEGATIVE_KW)
+        is_positive = SmartDialogFlowHandler._contains_keyword(answer, POSITIVE_KW) and not is_negative
+
+        if is_positive:
             session.solution_worked = True
-            logger.info(f"✅ Solution worked!")
+            logger.info(f"✅ Solution worked! User said: {user_message[:50]}")
             msg = smart_response_system.format_success_message(
                 "solusi yang kami berikan",
-                ["Jika ada masalah lagi, hubungi kami"]
+                ["Jika ada masalah lagi, hubungi kami kapan saja 😊"]
             )
             return (msg, DialogState.RESOLVED)
-        
-        elif answer_clean in SmartDialogFlowHandler.NEGATIVE_RESPONSES:
-            logger.info(f"❌ Solution didn't work, escalating...")
+
+        elif is_negative:
+            logger.info(f"❌ Solution didn't work, escalating... User said: {user_message[:50]}")
             msg = (
                 "Baik, saya akan eskalasi ke tim teknisi kami.\n\n"
                 "Untuk membuat tiket laporan, saya butuh 3 informasi singkat:\n"
@@ -469,14 +524,15 @@ class SmartDialogFlowHandler:
                 "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
             )
             return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
-        
+
         else:
-            # Unrecognized answer - ask again with clearer instructions
+            # Truly unrecognized — ask once more with clearer framing
             msg = smart_response_system.format_question(
                 "Maaf, saya belum mengerti jawaban Anda.\nApakah solusi tadi berhasil memperbaiki masalahnya?",
                 ["✅ Ya, berhasil!", "❌ Tidak, masih error"]
             )
             return (msg, DialogState.ASKING_SOLUTION_WORKED)
+
     
     @staticmethod
     def _handle_unit_input(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
@@ -656,20 +712,35 @@ class SmartDialogFlowHandler:
     
     @staticmethod
     def _handle_confirmation(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
-        """Handle confirmation - use hardcoded messages (AI too unreliable for yes/no flows)"""
+        """Handle confirmation — keyword substring matching (not exact set lookup)"""
         if not user_message:
             return SmartDialogFlowHandler._show_summary(session)
-        
+
         answer = user_message.lower().strip()
-        answer_clean = re.sub(r'[!?.,;:]', '', answer).strip()
-        
-        if answer_clean in SmartDialogFlowHandler.POSITIVE_RESPONSES:
-            # User confirmed - ready for ticket creation
+
+        # ── Positive confirmation keywords ──
+        POSITIVE_KW = [
+            'ya', 'yes', 'iya', 'ok', 'oke', 'okay', 'okeh', 'benar', 'betul',
+            'bener', 'correct', 'lanjut', 'lanjutin', 'buat', 'konfirmasi',
+            'sudah benar', 'sudah betul', 'sudah oke', 'data benar',
+            'sesuai', 'setuju', '1', 'satu', 'mantap', 'gas', 'fix'
+        ]
+        # ── Negative / want to change ──
+        NEGATIVE_KW = [
+            'tidak', 'no', 'nggak', 'gak', 'ga', 'bukan', 'salah', 'ubah',
+            'ganti', 'ralat', 'koreksi', 'ulang', 'ulangi', 'keliru',
+            'beda', 'berbeda', 'revisi', '2', 'dua', 'ada yang salah',
+            'mau ubah', 'mau ganti', 'belum benar', 'nope', 'enggak'
+        ]
+
+        is_negative = SmartDialogFlowHandler._contains_keyword(answer, NEGATIVE_KW)
+        is_positive = SmartDialogFlowHandler._contains_keyword(answer, POSITIVE_KW) and not is_negative
+
+        if is_positive:
             msg = "Baik, sedang membuat tiket support untuk Anda... ⏳"
             return (smart_response_system.format_for_whatsapp(msg), DialogState.CREATING_TICKET)
-        
-        elif answer_clean in SmartDialogFlowHandler.NEGATIVE_RESPONSES:
-            # User wants to change data - reset and go back
+
+        elif is_negative:
             session.vehicle_unit = None
             session.location = None
             session.issue_time = None
@@ -679,11 +750,11 @@ class SmartDialogFlowHandler:
                 "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
             )
             return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
-        
+
         else:
-            # Ask again with clear options
             msg = "Mohon pilih salah satu ya:\n\n1️⃣ Ya, data sudah benar\n2️⃣ Tidak, saya mau ubah\n\n(Kirim 1 atau 2)"
             return (smart_response_system.format_for_whatsapp(msg), DialogState.CONFIRMING_DETAILS)
+
     
     @staticmethod
     def _ask_for_unit(session: ConversationSession) -> Tuple[str, DialogState]:
@@ -695,4 +766,3 @@ class SmartDialogFlowHandler:
             f"(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
         )
         return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
-

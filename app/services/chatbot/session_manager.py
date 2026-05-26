@@ -125,7 +125,7 @@ class SessionManager:
     
     def create_session(self, phone_number: str) -> ConversationSession:
         """Create new conversation session"""
-        session_id = f"{phone_number}_{int(time.time())}"
+        session_id = f"{phone_number}_{time.time_ns()}"
         session = ConversationSession(phone_number, session_id)
         
         # Save to database
@@ -349,4 +349,3 @@ def init_session_manager(db_session_maker):
     session_manager = SessionManager(db_session_maker)
     logger.info("✅ Session Manager initialized with database persistence")
     return session_manager
-

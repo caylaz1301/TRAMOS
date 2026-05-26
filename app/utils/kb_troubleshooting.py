@@ -22,7 +22,11 @@ KB_TROUBLESHOOTING = {
             "gps", "lokasi", "location", "tracking", "posisi", "signal",
             "sinyal", "gps mati", "gps error", "positioning", "peta",
             "map", "koordinat", "navigate", "track", "tidak ketemu",
-            "hilang", "loss"
+            "hilang", "loss", "gps ga akurat", "posisi salah", "titik",
+            "maps", "geolocation", "lat", "lng", "longitude", "latitude",
+            "arah", "heading", "jalur", "rute", "route", "geser",
+            "meleset", "ga muncul", "tidak muncul di peta", "blank map",
+            "tidak terlacak", "ga ketemu lokasinya", "dimana", "ga nyala gps"
         ],
         "description": "Device GPS signal, location accuracy, and real-time tracking issues",
         "symptoms": [
@@ -481,6 +485,320 @@ KB_TROUBLESHOOTING = {
             "data_loss_risk": False,
         },
     },
+
+    # ========== MAINTENANCE / PERAWATAN RUTIN ==========
+    "maintenance": {
+        "category_id": "maintenance",
+        "title": "Pemeliharaan & Perawatan Rutin",
+        "keywords": [
+            "maintenance", "perawatan", "servis", "service", "jadwal",
+            "berkala", "oli", "ban", "tire", "rutin", "inspeksi",
+            "tune up", "km", "kilometer", "jarak tempuh", "reminder",
+            "pengingat", "cek rutin", "schedule", "jadwal servis",
+            "ganti oli", "filter", "radiator", "coolant", "rem", "brake",
+            "wiper", "lampu", "light", "aki", "battery", "accu"
+        ],
+        "description": "Jadwal perawatan kendaraan, servis berkala, dan reminder maintenance",
+        "symptoms": [
+            "Jadwal servis terlewat",
+            "Reminder maintenance tidak muncul",
+            "Tidak tahu kapan servis berikutnya",
+            "Odometer tidak terupdate",
+            "Riwayat servis hilang",
+        ],
+        "first_response": "Baik, saya bantu terkait perawatan kendaraan. Mari kita cek jadwal dan kebutuhan maintenance-nya 🔧",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Cek jadwal servis di sistem",
+                "instruction": "Buka aplikasi TRAMOS → Menu Kendaraan → Pilih unit → Tab 'Maintenance'. Lihat jadwal servis berikutnya berdasarkan kilometer atau waktu.",
+                "verification": "Jadwal servis terbaru terlihat di layar.",
+            },
+            {
+                "step": 2,
+                "title": "Perbarui data odometer",
+                "instruction": "Jika jarak tempuh tidak otomatis terupdate dari GPS, input manual: Kendaraan → Update Odometer → Masukkan km terbaru.",
+                "verification": "Angka km di sistem sudah sesuai dengan speedometer kendaraan.",
+            },
+            {
+                "step": 3,
+                "title": "Aktifkan reminder otomatis",
+                "instruction": "Masuk ke Settings → Notifications → Aktifkan 'Maintenance Reminder'. Set interval pengingat: 7 hari, 3 hari, dan 1 hari sebelum jadwal.",
+                "verification": "Notifikasi test diterima di WhatsApp.",
+            },
+            {
+                "step": 4,
+                "title": "Catat riwayat servis terbaru",
+                "instruction": "Setelah servis selesai, input di TRAMOS: Kendaraan → Riwayat Servis → Tambah Record. Isi: tanggal, jenis servis, biaya, bengkel.",
+                "verification": "Record servis muncul di riwayat kendaraan.",
+            },
+        ],
+        "workaround": "Catat jadwal servis secara manual dan hubungi koordinator fleet untuk penjadwalan ulang.",
+        "escalation_triggers": [
+            "Kendaraan sudah sangat overdue servis (>2000 km dari jadwal)",
+            "Ada bunyi tidak normal dari mesin/rem",
+            "Warning light menyala di dashboard kendaraan",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["missed_schedule", "odometer_error", "notification_off"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== SENSOR & IoT DEVICE ISSUES ==========
+    "sensor": {
+        "category_id": "sensor",
+        "title": "Sensor & IoT Device",
+        "keywords": [
+            "sensor", "iot", "suhu", "temperature", "fuel", "bbm",
+            "bensin", "solar", "bahan bakar", "level", "tangki", "tank",
+            "odometer", "speed", "kecepatan", "rpm", "door",
+            "pintu", "segel", "seal", "geofence", "geo fence", "zona",
+            "alert", "notifikasi", "alarm", "buzzer", "panic", "sos",
+            "ibutton", "rfid", "driver id", "accelerometer", "getaran",
+            "vibration", "tilt", "kemiringan"
+        ],
+        "description": "Sensor IoT pada kendaraan: fuel sensor, temperature, door, geofence, dll",
+        "symptoms": [
+            "Sensor fuel tidak akurat",
+            "Data suhu tidak muncul",
+            "Alert geofence tidak berfungsi",
+            "Sensor pintu selalu open/close",
+            "Driver ID tidak terdeteksi",
+            "Alarm tidak berbunyi",
+        ],
+        "first_response": "Saya bantu troubleshoot masalah sensor. Mari kita identifikasi dan perbaiki 📊",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Identifikasi sensor bermasalah",
+                "instruction": "Buka TRAMOS → Kendaraan → Detail Unit → Tab 'Sensor'. Cek status setiap sensor: Hijau (OK), Kuning (Warning), Merah (Error).",
+                "verification": "Sensor yang bermasalah sudah teridentifikasi dari indikator warna.",
+            },
+            {
+                "step": 2,
+                "title": "Cek koneksi fisik sensor",
+                "instruction": "Pastikan kabel sensor terpasang dengan baik ke terminal device. Cek apakah ada kabel yang longgar, terputus, atau teroksidasi (berkarat).",
+                "verification": "Koneksi kabel sudah kencang dan bersih.",
+            },
+            {
+                "step": 3,
+                "title": "Kalibrasi ulang sensor",
+                "instruction": "Untuk fuel sensor: isi tangki penuh → catat pembacaan → kuras sebagian → catat lagi. Kirim data kalibrasi ke tim teknis. Untuk sensor lain: restart device dan tunggu 5 menit.",
+                "verification": "Pembacaan sensor sudah mendekati nilai aktual (toleransi ±5%).",
+            },
+            {
+                "step": 4,
+                "title": "Reset konfigurasi sensor di server",
+                "instruction": "Hubungi admin untuk reset parameter sensor dari server. Berikan info: ID kendaraan, jenis sensor, dan gejala masalah.",
+                "verification": "Data sensor sudah terupdate dan akurat di dashboard.",
+            },
+        ],
+        "workaround": "Gunakan metode manual (stik ukur untuk fuel, thermometer untuk suhu) sambil menunggu perbaikan sensor.",
+        "escalation_triggers": [
+            "Sensor fisik rusak/pecah",
+            "Kabel terputus tidak bisa disambung",
+            "Butuh penggantian hardware sensor",
+            "Data sensor sangat jauh dari realita (>20% deviasi)",
+        ],
+        "metadata": {
+            "typical_resolution_time": "15-30 minutes",
+            "technical_difficulty": "high",
+            "common_root_causes": ["wiring", "calibration", "hardware_failure", "water_damage"],
+            "requires_hardware_access": True,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== DRIVER BEHAVIOR & MANAGEMENT ==========
+    "driver": {
+        "category_id": "driver",
+        "title": "Driver & Perilaku Pengemudi",
+        "keywords": [
+            "driver", "pengemudi", "sopir", "supir", "perilaku", "behavior",
+            "ngebut", "speeding", "harsh", "braking", "rem mendadak",
+            "belok tajam", "cornering", "idle", "diam", "parkir lama",
+            "sim", "lisensi", "licence", "skor", "score", "rating",
+            "pelanggaran", "violation", "fatigue", "ngantuk", "capek",
+            "lelah", "jam kerja", "overtime", "shift", "jadwal driver",
+            "absen", "kehadiran", "attendance", "ibutton", "rfid"
+        ],
+        "description": "Monitoring perilaku pengemudi, skor keselamatan, dan manajemen shift driver",
+        "symptoms": [
+            "Skor driver turun drastis",
+            "Alert speeding terus menerus",
+            "Driver ID tidak terdeteksi",
+            "Jam kerja melebihi batas",
+            "Riwayat pelanggaran tidak muncul",
+        ],
+        "first_response": "Baik, saya bantu terkait manajemen driver dan perilaku pengemudi. Mari kita cek data yang tersedia 🚗",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Cek profil driver di sistem",
+                "instruction": "Buka TRAMOS → Menu Driver → Cari nama driver. Lihat skor keselamatan, jumlah pelanggaran, dan status SIM.",
+                "verification": "Profil driver muncul dengan data lengkap.",
+            },
+            {
+                "step": 2,
+                "title": "Review riwayat pelanggaran",
+                "instruction": "Di profil driver, buka tab 'Pelanggaran'. Filter berdasarkan tanggal. Cek jenis pelanggaran: speeding, harsh braking, idle time berlebihan.",
+                "verification": "Daftar pelanggaran terlihat dengan detail waktu dan lokasi.",
+            },
+            {
+                "step": 3,
+                "title": "Cek konfigurasi alert",
+                "instruction": "Masuk ke Settings → Alert Rules → Driver. Pastikan threshold sudah benar: batas kecepatan, durasi idle, jam kerja maksimal.",
+                "verification": "Alert threshold sesuai dengan kebijakan perusahaan.",
+            },
+            {
+                "step": 4,
+                "title": "Verifikasi device identifikasi driver",
+                "instruction": "Pastikan iButton/RFID driver terdaftar di sistem. Cek di Kendaraan → Driver Assignment → Test scan iButton.",
+                "verification": "Driver ID terdeteksi dan terhubung ke profil yang benar.",
+            },
+        ],
+        "workaround": "Catat pelanggaran secara manual dari laporan harian sambil menunggu konfigurasi sistem diperbaiki.",
+        "escalation_triggers": [
+            "Driver terlibat kecelakaan",
+            "Jam kerja melebihi regulasi (>12 jam)",
+            "Skor keselamatan di bawah 40%",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["config_threshold", "driver_id_unregistered", "device_malfunction"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== REPORT & DATA EXPORT ==========
+    "report": {
+        "category_id": "report",
+        "title": "Laporan & Export Data",
+        "keywords": [
+            "laporan", "report", "export", "download", "unduh", "pdf",
+            "excel", "csv", "print", "cetak", "riwayat", "history",
+            "log", "data", "statistik", "grafik", "chart", "analisis",
+            "ringkasan", "summary", "rekapitulasi", "rekap", "bulanan",
+            "mingguan", "harian", "daily", "weekly", "monthly",
+            "kilometer", "perjalanan", "trip", "journey", "fuel report"
+        ],
+        "description": "Pembuatan laporan, export data, dan analisis riwayat perjalanan",
+        "symptoms": [
+            "Laporan tidak bisa di-download",
+            "Data di laporan tidak akurat",
+            "Export ke Excel gagal",
+            "Grafik tidak muncul",
+            "Filter tanggal tidak berfungsi",
+        ],
+        "first_response": "Saya bantu terkait laporan dan export data. Mari kita cek kebutuhannya 📋",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Pilih jenis laporan",
+                "instruction": "Buka TRAMOS → Menu Laporan. Pilih jenis: Trip Report, Fuel Report, Driver Report, atau Summary Report. Tentukan periode tanggal yang diinginkan.",
+                "verification": "Halaman laporan terbuka dengan filter yang benar.",
+            },
+            {
+                "step": 2,
+                "title": "Generate laporan",
+                "instruction": "Setelah filter diisi, klik 'Generate'. Tunggu proses pengambilan data (bisa 10-30 detik untuk data besar). Jika timeout, perkecil range tanggal.",
+                "verification": "Data laporan muncul di layar dalam format tabel.",
+            },
+            {
+                "step": 3,
+                "title": "Export ke format yang diinginkan",
+                "instruction": "Klik tombol Export → pilih format (PDF, Excel, CSV). Untuk PDF pastikan browser mengizinkan popup. Untuk Excel pastikan ukuran file tidak terlalu besar (<50MB).",
+                "verification": "File berhasil ter-download ke komputer.",
+            },
+            {
+                "step": 4,
+                "title": "Validasi data laporan",
+                "instruction": "Buka file yang sudah di-download. Cross-check beberapa data sample dengan data live di aplikasi. Pastikan kolom dan angka sesuai.",
+                "verification": "Data di file export cocok dengan data di aplikasi.",
+            },
+        ],
+        "workaround": "Screenshot data dari layar atau copy-paste ke spreadsheet secara manual jika export tidak berfungsi.",
+        "escalation_triggers": [
+            "Data hilang dari laporan (gap data >1 jam)",
+            "Server timeout saat generate laporan besar",
+            "Data laporan sangat berbeda dengan kenyataan",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5-10 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["browser_popup_blocked", "large_data_range", "server_timeout"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
+
+    # ========== ACCOUNT & ACCESS ==========
+    "account": {
+        "category_id": "account",
+        "title": "Akun & Akses",
+        "keywords": [
+            "login", "password", "kata sandi", "sandi", "akun", "account",
+            "masuk", "daftar", "register", "lupa password", "reset",
+            "ganti password", "profil", "profile", "hak akses", "permission",
+            "role", "admin", "user", "operator", "logout", "keluar",
+            "session", "expired", "kadaluarsa", "token", "otentikasi",
+            "otp", "verifikasi", "email", "aktivasi", "blocked", "diblokir"
+        ],
+        "description": "Manajemen akun pengguna, login, password, dan hak akses",
+        "symptoms": [
+            "Tidak bisa login",
+            "Password lupa",
+            "Akun terkunci/blocked",
+            "Session expired terus",
+            "Tidak punya akses ke fitur tertentu",
+        ],
+        "first_response": "Saya bantu terkait akun dan akses. Mari kita selesaikan masalahnya 🔐",
+        "troubleshooting_steps": [
+            {
+                "step": 1,
+                "title": "Verifikasi kredensial login",
+                "instruction": "Pastikan username dan password diketik dengan benar. Cek Caps Lock mati. Username biasanya format: nama.belakang atau email.",
+                "verification": "Login berhasil setelah memasukkan kredensial yang benar.",
+            },
+            {
+                "step": 2,
+                "title": "Reset password",
+                "instruction": "Jika lupa password: Klik 'Lupa Password' di halaman login → masukkan email terdaftar → cek inbox (dan spam folder) → ikuti link reset → buat password baru minimal 8 karakter.",
+                "verification": "Password berhasil di-reset dan bisa login dengan password baru.",
+            },
+            {
+                "step": 3,
+                "title": "Cek status akun",
+                "instruction": "Hubungi admin untuk cek apakah akun masih aktif. Akun bisa di-nonaktifkan jika: terlalu banyak salah login (>5x), masa kontrak habis, atau dihapus admin.",
+                "verification": "Admin mengkonfirmasi status akun aktif.",
+            },
+            {
+                "step": 4,
+                "title": "Periksa hak akses",
+                "instruction": "Jika bisa login tapi fitur terbatas, cek role di profil. Minta admin menambah permission jika diperlukan: Settings → Users → Edit Role.",
+                "verification": "Semua fitur yang dibutuhkan sudah bisa diakses.",
+            },
+        ],
+        "workaround": "Gunakan akun rekan kerja sementara atau hubungi admin langsung via WhatsApp/telepon untuk reset darurat.",
+        "escalation_triggers": [
+            "Akun admin utama terkunci",
+            "Dugaan akses tidak sah (hacking)",
+            "Semua user tidak bisa login (masalah server)",
+        ],
+        "metadata": {
+            "typical_resolution_time": "5 minutes",
+            "technical_difficulty": "easy",
+            "common_root_causes": ["forgotten_password", "account_locked", "permission_issue"],
+            "requires_hardware_access": False,
+            "data_loss_risk": False,
+        },
+    },
 }
 
 
@@ -489,11 +807,23 @@ KB_TROUBLESHOOTING = {
 # ============================================================================
 
 def get_kb_category(keywords: list) -> Optional[dict]:
-    """Find KB category metadata based on keywords"""
+    """Find best-matching KB category based on keywords.
+    Uses keyword hit counting for smarter matching instead of first-match.
+    """
+    if not keywords:
+        return None
+    
+    search_text = ' '.join(keywords).lower()
+    best_match = None
+    best_score = 0
+    
     for category, kb_data in KB_TROUBLESHOOTING.items():
-        if any(kw.lower() in ' '.join(keywords).lower() for kw in kb_data["keywords"]):
-            return {"category": category, **kb_data}
-    return None
+        score = sum(1 for kw in kb_data["keywords"] if kw.lower() in search_text)
+        if score > best_score:
+            best_score = score
+            best_match = {"category": category, "confidence": min(1.0, score / 3.0), **kb_data}
+    
+    return best_match
 
 
 def get_category_by_id(category_id: str) -> Optional[dict]:

@@ -15,7 +15,14 @@ function NavIcon({ path }) {
   );
 }
 
-export default function Layout({ currentPage, onNavigate, username, onLogout, children }) {
+export default function Layout({ currentPage, onNavigate, username, userRole, onLogout, children }) {
+  const displayRole = {
+    admin: 'Administrator',
+    user: 'User',
+    operator: 'Operator',
+    analyst: 'Analyst',
+  }[userRole] || 'User';
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -59,11 +66,11 @@ export default function Layout({ currentPage, onNavigate, username, onLogout, ch
         <div className="sidebar-footer">
           <div className="user-section">
             <div className="user-avatar">
-              {(username || 'A').charAt(0).toUpperCase()}
+              {(username || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="user-details">
-              <span className="user-name">{username || 'Admin'}</span>
-              <span className="user-role">Administrator</span>
+              <span className="user-name">{username || 'User'}</span>
+              <span className="user-role">{displayRole}</span>
             </div>
           </div>
           <button className="btn-logout" onClick={onLogout} title="Keluar">
