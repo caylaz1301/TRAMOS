@@ -4,19 +4,19 @@ TRAMOS (Tracking Monitor Safety) is an enterprise-grade AI-powered WhatsApp supp
 
 ## Features
 
-✅ **WhatsApp Integration** - Receive and respond to driver messages via Meta WhatsApp Business API  
-✅ **Ultra-Smart Dialog** - AI-powered conversation with 6-dimensional problem analysis  
-✅ **Knowledge Base** - Automated troubleshooting with KB solution search & user feedback  
-✅ **Automatic Ticketing** - Create osTicket tickets from conversations with full context  
-✅ **Multi-turn Conversations** - Remember context with PostgreSQL persistence  
-✅ **Analytics Dashboard** - React-based real-time metrics & reporting  
-✅ **Async Architecture** - High performance with httpx async HTTP client  
+✅ **WhatsApp Integration** - Receive and respond to driver messages via Meta WhatsApp Business API
+✅ **Ultra-Smart Dialog** - AI-powered conversation with 6-dimensional problem analysis
+✅ **Knowledge Base RAG** - PostgreSQL + pgvector retrieval from TRAMOS operator/driver KB
+✅ **Automatic Ticketing** - Create osTicket tickets from conversations with full context
+✅ **Multi-turn Conversations** - Remember context with PostgreSQL persistence
+✅ **Analytics Dashboard** - React-based real-time metrics & reporting
+✅ **Async Architecture** - High performance with httpx async HTTP client
 
 ## Tech Stack
 
 - **Backend**: Python 3.10+, FastAPI
-- **Database**: PostgreSQL + SQLAlchemy
-- **AI/LLM**: Ollama (localhost) + Mistral 7B
+- **Database**: PostgreSQL + pgvector + SQLAlchemy
+- **AI/LLM**: Google Gemini API + Gemini Embedding
 - **Frontend**: React 18+ with Vite
 - **Ticketing**: osTicket API
 - **Messaging**: Meta WhatsApp Business API
@@ -36,7 +36,8 @@ TRAMOS/
 │   │   ├── whatsapp.py               # WhatsApp webhook handler
 │   │   ├── tickets.py                # Ticket API endpoints
 │   │   ├── analytics.py              # Analytics API
-│   │   └── auth.py                   # JWT authentication
+│   │   ├── auth.py                   # JWT authentication
+│   │   └── kb.py                     # Knowledge Base RAG API
 │   ├── schemas/
 │   │   ├── whatsapp.py               # WhatsApp data models
 │   │   └── ticket.py                 # Ticket request/response models
@@ -49,8 +50,10 @@ TRAMOS/
 │   │   ├── whatsapp_service.py       # WhatsApp API client (async)
 │   │   └── conversation_manager.py   # Legacy conversation manager
 │   └── utils/
-│       ├── ai_logic.py               # AI engine (Ollama)
+│       ├── ai_logic.py               # AI engine (Gemini)
 │       └── kb_troubleshooting.py     # Knowledge base data
+├── knowledge_base/                    # TXT source docs untuk RAG ingestion
+├── scripts/                           # Migration, ingestion, and terminal test scripts
 ├── dashboard/                         # React analytics dashboard
 │   └── src/
 │       ├── components/
@@ -81,6 +84,8 @@ Required settings:
 - `OSTICKET_API_URL` - Your osTicket API endpoint
 - `OSTICKET_API_KEY` - API key from osTicket admin panel
 - `WEBHOOK_VERIFY_TOKEN` - Change to a strong random value
+- `GEMINI_API_KEY` - Gemini API key for chat and KB embeddings
+- `DATABASE_URL` - Default local Docker URL is `postgresql://postgres:postgres@localhost:5434/tramos_db`
 
 Optional (for outbound WhatsApp messages):
 - `WHATSAPP_API_URL` - WhatsApp Graph API URL
@@ -141,7 +146,7 @@ Each user's conversation is tracked per phone number with:
 
 **Verify Webhook** (WhatsApp calls this on setup)
 ```
-GET /webhook/whatsapp?hub_mode=subscribe&hub_challenge=...&hub_verify_token=...
+GET /webhook/whatsapp?hub.mode=subscribe&hub.challenge=...&hub.verify_token=...
 ```
 
 **Receive Messages**
@@ -185,10 +190,16 @@ Quick start:
 
 ```bash
 # Test health check
-curl http://localhost:9999/tickets/health
+curl http://localhost:9999/health
+
+# Test Knowledge Base RAG
+python scripts/test_kb_retrieval.py
 
 # Test webhook verification
-curl "http://localhost:9999/webhook/whatsapp?hub_mode=subscribe&hub_challenge=TEST&hub_verify_token=tramos_webhook_token_change_me"
+curl "http://localhost:9999/webhook/whatsapp?hub.mode=subscribe&hub.challenge=TEST&hub.verify_token=tramos_webhook_token_change_me"
+
+# Test dialog flow without WhatsApp API
+python scripts/dialog_flow_terminal_test.py --skip-ticket-scenarios
 
 # Test ticket creation
 curl -X POST http://localhost:9999/tickets \
@@ -219,7 +230,7 @@ server {
     server_name your-domain.com;
     ssl_certificate /path/to/cert;
     ssl_certificate_key /path/to/key;
-    
+
     location / {
         proxy_pass http://127.0.0.1:9999;
         proxy_set_header Host $host;

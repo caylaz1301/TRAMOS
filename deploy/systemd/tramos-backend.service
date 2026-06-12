@@ -1,0 +1,18 @@
+[Unit]
+Description=TRAMOS FastAPI Backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=tramos
+Group=tramos
+WorkingDirectory=/opt/tramos
+EnvironmentFile=/opt/tramos/.env.production
+ExecStart=/opt/tramos/venv/bin/uvicorn main:app --host 127.0.0.1 --port 9999 --workers 2
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

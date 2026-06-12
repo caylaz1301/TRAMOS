@@ -6,7 +6,7 @@ import logging
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Header, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 import jwt
@@ -20,13 +20,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # JWT Config
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "tramos_dashboard_secret_key_change_me")
+SECRET_KEY = settings.JWT_SECRET_KEY
 ALGORITHM = "HS256"
-TOKEN_EXPIRE_MINUTES = 480  # 8 hours
+TOKEN_EXPIRE_MINUTES = settings.TOKEN_EXPIRE_MINUTES
 
-# Legacy admin (fallback so you're never locked out)
-LEGACY_ADMIN_USERNAME = os.getenv("DASHBOARD_USERNAME", "admin")
-LEGACY_ADMIN_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "admin123")
+# Legacy admin hanya boleh aktif jika password diisi eksplisit dari .env.
+LEGACY_ADMIN_USERNAME = settings.DASHBOARD_USERNAME
+LEGACY_ADMIN_PASSWORD = settings.DASHBOARD_PASSWORD
+LEGACY_ADMIN_ENABLED = settings.DASHBOARD_ENABLE_LEGACY_ADMIN and bool(LEGACY_ADMIN_PASSWORD)
 
 
 # ============================================================================
@@ -115,6 +116,16 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 
+def extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    """Ambil JWT dari header Authorization: Bearer <token>."""
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
 # ============================================================================
 # REGISTER
 # ============================================================================
@@ -123,12 +134,12 @@ def verify_token(token: str) -> Optional[dict]:
 async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new dashboard user account"""
     email = request.email.strip().lower()
-    
+
     # Check if already exists
     existing = db.query(DashboardUser).filter(DashboardUser.email == email).first()
     if existing and existing.is_verified:
         raise HTTPException(status_code=400, detail="Email sudah terdaftar. Silakan login.")
-    
+
     if existing and not existing.is_verified:
         # Re-send OTP for unverified account
         otp = generate_otp()
@@ -139,11 +150,11 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
         if request.phone:
             existing.phone = request.phone.strip()
         db.commit()
-        
+
         send_otp_email(email, otp, request.full_name.strip())
-        
+
         return {"message": "Kode OTP telah dikirim ulang ke email kamu.", "email": email}
-    
+
     # Create new user
     otp = generate_otp()
     new_user = DashboardUser(
@@ -158,13 +169,13 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.add(new_user)
     db.commit()
-    
+
     # Send OTP email
     email_sent = send_otp_email(email, otp, request.full_name.strip())
-    
+
     if not email_sent:
         logger.warning(f"OTP email failed for {email}, but account created")
-    
+
     logger.info(f"New user registered: {email}")
     return {"message": "Akun berhasil dibuat! Cek email untuk kode verifikasi.", "email": email}
 
@@ -177,27 +188,27 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
     """Verify OTP code to activate account"""
     email = request.email.strip().lower()
-    
+
     user = db.query(DashboardUser).filter(DashboardUser.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Akun tidak ditemukan.")
-    
+
     if user.is_verified:
         return {"message": "Akun sudah terverifikasi. Silakan login.", "verified": True}
-    
+
     # Check OTP
     if not user.otp_code or user.otp_code != request.otp_code.strip():
         raise HTTPException(status_code=400, detail="Kode OTP salah.")
-    
+
     if user.otp_expires_at and datetime.utcnow() > user.otp_expires_at:
         raise HTTPException(status_code=400, detail="Kode OTP sudah kedaluwarsa. Kirim ulang kode.")
-    
+
     # Activate
     user.is_verified = True
     user.otp_code = None
     user.otp_expires_at = None
     db.commit()
-    
+
     logger.info(f"User verified: {email}")
     return {"message": "Akun berhasil diverifikasi! Silakan login.", "verified": True}
 
@@ -210,21 +221,21 @@ async def verify_otp(request: VerifyOTPRequest, db: Session = Depends(get_db)):
 async def resend_otp(request: ResendOTPRequest, db: Session = Depends(get_db)):
     """Resend OTP verification code"""
     email = request.email.strip().lower()
-    
+
     user = db.query(DashboardUser).filter(DashboardUser.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Akun tidak ditemukan.")
-    
+
     if user.is_verified:
         return {"message": "Akun sudah terverifikasi."}
-    
+
     otp = generate_otp()
     user.otp_code = otp
     user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
     db.commit()
-    
+
     send_otp_email(email, otp, user.full_name)
-    
+
     return {"message": "Kode OTP baru telah dikirim ke email kamu."}
 
 
@@ -236,9 +247,9 @@ async def resend_otp(request: ResendOTPRequest, db: Session = Depends(get_db)):
 async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """Login with email/phone + password"""
     identifier = request.username.strip().lower()
-    
-    # Legacy admin check (so you're never locked out)
-    if identifier == LEGACY_ADMIN_USERNAME and request.password == LEGACY_ADMIN_PASSWORD:
+
+    # Legacy admin hanya untuk development/demo, dan harus diaktifkan dengan password eksplisit.
+    if LEGACY_ADMIN_ENABLED and identifier == LEGACY_ADMIN_USERNAME and request.password == LEGACY_ADMIN_PASSWORD:
         token = create_access_token(
             subject=LEGACY_ADMIN_USERNAME,
             name="Admin",
@@ -251,37 +262,37 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             "expires_in": TOKEN_EXPIRE_MINUTES * 60,
             "user": {"name": "Admin", "email": "", "role": "admin"}
         }
-    
+
     # Find user by email or phone
     user = db.query(DashboardUser).filter(
         (DashboardUser.email == identifier) | (DashboardUser.phone == identifier)
     ).first()
-    
+
     if not user:
         raise HTTPException(status_code=401, detail="Akun tidak ditemukan. Silakan buat akun terlebih dahulu.")
-    
+
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="Akun belum diverifikasi. Cek email untuk kode OTP.")
-    
+
     if not user.password_hash:
         raise HTTPException(status_code=401, detail="Akun ini terdaftar via Google. Gunakan tombol Google untuk login.")
-    
+
     if not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Password salah.")
-    
+
     # Update last login
     user.last_login_at = datetime.utcnow()
     db.commit()
-    
+
     token = create_access_token(
         subject=user.email,
         name=user.full_name,
         role=user.role,
         email=user.email
     )
-    
+
     logger.info(f"User logged in: {user.email}")
-    
+
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -296,66 +307,113 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/google")
 async def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db)):
-    """Google SSO — auto-registers new users, logs in existing ones"""
+    """
+    Google SSO — two modes:
+    - is_signup=True  → register new account via Google (must not already exist, sends OTP for verification)
+    - is_signup=False → login with existing verified Google-linked account
+    """
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
-    
+
     try:
         from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
-        
+
         idinfo = google_id_token.verify_oauth2_token(
             request.id_token,
             google_requests.Request(),
             settings.GOOGLE_CLIENT_ID
         )
-        
+
         email = idinfo.get("email", "").lower()
         name = idinfo.get("name", email)
         google_id = idinfo.get("sub", "")
-        
+
         if not email:
             raise HTTPException(status_code=400, detail="Tidak dapat mengambil email dari akun Google.")
-        
-        # Check if user exists
+
         user = db.query(DashboardUser).filter(DashboardUser.email == email).first()
-        
-        if user:
-            # Existing user — log in
-            user.last_login_at = datetime.utcnow()
-            if not user.google_id:
+
+        if request.is_signup:
+            # ── SIGN UP via Google ──
+            if user and user.is_verified:
+                raise HTTPException(status_code=400, detail="Email sudah terdaftar. Silakan login.")
+
+            if user and not user.is_verified:
+                # Update existing unverified account with Google info
+                user.full_name = name
                 user.google_id = google_id
-            db.commit()
-        else:
-            # New user — auto-register (Google users are auto-verified)
-            user = DashboardUser(
+                user.auth_provider = "google"
+                otp = generate_otp()
+                user.otp_code = otp
+                user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
+                db.commit()
+                send_otp_email(email, otp, name)
+                return {
+                    "needs_verification": True,
+                    "message": "Kode OTP telah dikirim ke email kamu untuk verifikasi.",
+                    "email": email,
+                }
+
+            # Create new user — send OTP for verification
+            otp = generate_otp()
+            new_user = DashboardUser(
                 email=email,
                 full_name=name,
                 google_id=google_id,
                 auth_provider="google",
-                is_verified=True,  # Google accounts are pre-verified
+                is_verified=False,
+                otp_code=otp,
+                otp_expires_at=datetime.utcnow() + timedelta(minutes=10),
                 role="user",
             )
-            db.add(user)
+            db.add(new_user)
             db.commit()
-            logger.info(f"New Google user auto-registered: {email}")
-        
-        token = create_access_token(
-            subject=user.email,
-            name=user.full_name,
-            role=user.role,
-            email=user.email
-        )
-        
-        logger.info(f"Google login for: {email}")
-        
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "expires_in": TOKEN_EXPIRE_MINUTES * 60,
-            "user": {"name": user.full_name, "email": user.email, "role": user.role}
-        }
-        
+
+            send_otp_email(email, otp, name)
+            logger.info(f"New Google sign-up (pending OTP): {email}")
+
+            return {
+                "needs_verification": True,
+                "message": "Akun berhasil dibuat! Cek email untuk kode verifikasi.",
+                "email": email,
+            }
+        else:
+            # ── SIGN IN via Google ──
+            if not user:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Akun belum terdaftar. Silakan daftar terlebih dahulu."
+                )
+
+            if not user.is_verified:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Akun belum diverifikasi. Cek email untuk kode OTP."
+                )
+
+            # Login successful
+            user.last_login_at = datetime.utcnow()
+            if not user.google_id:
+                user.google_id = google_id
+            db.commit()
+
+            token = create_access_token(
+                subject=user.email,
+                name=user.full_name,
+                role=user.role,
+                email=user.email
+            )
+
+            logger.info(f"Google login for: {email}")
+
+            return {
+                "access_token": token,
+                "token_type": "bearer",
+                "expires_in": TOKEN_EXPIRE_MINUTES * 60,
+                "user": {"name": user.full_name, "email": user.email, "role": user.role}
+            }
+
     except ValueError as e:
         logger.warning(f"Invalid Google token: {e}")
         raise HTTPException(status_code=401, detail="Token Google tidak valid.")
@@ -371,15 +429,19 @@ async def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db
 # ============================================================================
 
 @router.get("/me")
-async def get_current_user(token: Optional[str] = None):
+async def get_current_user(
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(default=None),
+):
     """Get current user info from JWT"""
+    token = extract_bearer_token(authorization) or token
     if not token:
         raise HTTPException(status_code=401, detail="No token provided")
-    
+
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Token tidak valid atau kedaluwarsa")
-    
+
     return {
         "username": payload.get("sub", ""),
         "name": payload.get("name", "User"),
@@ -388,13 +450,57 @@ async def get_current_user(token: Optional[str] = None):
     }
 
 
+@router.delete("/me")
+async def delete_current_user(
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """Hapus akun dashboard milik user yang sedang login.
+
+    Endpoint ini hanya menghapus akun lokal TRAMOS Dashboard. Akun Google asli
+    tetap aman karena berada di luar sistem TRAMOS.
+    """
+    token = extract_bearer_token(authorization) or token
+    if not token:
+        raise HTTPException(status_code=401, detail="No token provided")
+
+    payload = verify_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Token tidak valid atau kedaluwarsa")
+
+    email = (payload.get("email") or payload.get("sub") or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Identitas akun tidak lengkap.")
+
+    user = db.query(DashboardUser).filter(DashboardUser.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Akun tidak ditemukan atau sudah dihapus.")
+
+    deleted_email = user.email
+    db.delete(user)
+    db.commit()
+
+    logger.info("Dashboard account deleted: %s", deleted_email)
+    return {
+        "message": "Akun dashboard berhasil dihapus.",
+        "email": deleted_email,
+    }
+
+
 # ============================================================================
 # VERIFY TOKEN
 # ============================================================================
 
 @router.post("/verify")
-async def verify(token: str):
+async def verify(
+    token: Optional[str] = None,
+    authorization: Optional[str] = Header(default=None),
+):
     """Verify token endpoint"""
+    token = extract_bearer_token(authorization) or token
+    if not token:
+        raise HTTPException(status_code=401, detail="No token provided")
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")

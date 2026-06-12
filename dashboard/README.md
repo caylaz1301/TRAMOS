@@ -95,9 +95,9 @@ The dashboard will be available at `http://localhost:5173`
    ```
 
 5. **Login**
-   - Default username: `admin`
-   - Default password: `admin123`
-   - (Change in environment variables)
+   - Username admin legacy mengikuti `DASHBOARD_USERNAME`
+   - Password wajib diisi eksplisit lewat `DASHBOARD_PASSWORD`
+   - Untuk production, ganti `JWT_SECRET_KEY` dengan secret panjang dan acak
 
 ## Configuration
 
@@ -105,8 +105,8 @@ The dashboard will be available at `http://localhost:5173`
 
 ```env
 DASHBOARD_USERNAME=admin
-DASHBOARD_PASSWORD=admin123
-JWT_SECRET_KEY=tramos_dashboard_secret_key_change_me
+DASHBOARD_PASSWORD=change-this-admin-password
+JWT_SECRET_KEY=change-this-to-a-long-random-secret
 ```
 
 ## Build for Production
@@ -176,7 +176,7 @@ curl http://localhost:9999/health
 ```
 
 ### Login Failed
-- Check credentials (default: admin/admin123)
+- Check credentials from `.env`
 - Verify DASHBOARD_USERNAME and DASHBOARD_PASSWORD in .env
 
 ### No Data Showing

@@ -48,8 +48,8 @@ def apply_date_filter(query, model, start_date: str = None, end_date: str = None
         try:
             start = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             query = query.filter(model.created_at >= start)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.debug("Invalid start_date ignored: %s (%s)", start_date, exc)
     if end_date:
         try:
             end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
@@ -57,8 +57,8 @@ def apply_date_filter(query, model, start_date: str = None, end_date: str = None
             if end.hour == 0 and end.minute == 0:
                 end = end.replace(hour=23, minute=59, second=59)
             query = query.filter(model.created_at <= end)
-        except ValueError:
-            pass
+        except ValueError as exc:
+            logger.debug("Invalid end_date ignored: %s (%s)", end_date, exc)
     return query
 
 
@@ -94,14 +94,21 @@ async def get_overview_stats(start_date: str = None, end_date: str = None, db: S
         msg_filtered = apply_date_filter(msg_query, WhatsAppSession, start_date, end_date)
         total_messages = msg_filtered.scalar() or 0
         
-        # Success rate
-        success_rate = (total_tickets / total_sessions * 100) if total_sessions > 0 else 0
+        # Success rate dashboard = sesi yang selesai oleh AI tanpa dibuatkan tiket.
+        ai_resolved_query = db.query(WhatsAppSession).filter(
+            WhatsAppSession.ticket_id.is_(None),
+            WhatsAppSession.current_state.in_(["resolved", "closed"]),
+        )
+        ai_resolved_filtered = apply_date_filter(ai_resolved_query, WhatsAppSession, start_date, end_date)
+        ai_resolved_sessions = ai_resolved_filtered.count()
+        success_rate = (ai_resolved_sessions / total_sessions * 100) if total_sessions > 0 else 0
         
         return {
             "total_sessions": total_sessions,
             "total_tickets": total_tickets,
             "active_sessions": active_sessions,
             "total_messages": total_messages,
+            "ai_resolved_sessions": ai_resolved_sessions,
             "success_rate": round(success_rate, 2),
             "avg_messages_per_session": round(total_messages / total_sessions, 2) if total_sessions > 0 else 0
         }
@@ -237,7 +244,7 @@ async def get_quality_metrics(start_date: str = None, end_date: str = None, db: 
                 "abandoned_sessions": 0
             }
         
-        completed = len([s for s in sessions if s.current_state == "closed"])
+        completed = len([s for s in sessions if s.current_state in {"closed", "resolved"}])
         abandoned = len([s for s in sessions if s.current_state != "closed" and s.is_active == False])
         
         total_messages = sum(s.message_count for s in sessions)
@@ -497,7 +504,6 @@ async def get_active_alerts(db: Session = Depends(get_db)):
 async def health_check(db: Session = Depends(get_db)):
     """Quick health check endpoint with component status"""
     try:
-        import requests as _req
         from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
 
         alerts = AlertManager.check_system_health(db)
@@ -511,25 +517,31 @@ async def health_check(db: Session = Depends(get_db)):
         except Exception:
             db_status = "error"
 
-        # Ollama / AI Engine
+        # Gemini readiness cukup dicek dari konfigurasi agar endpoint monitoring tetap cepat.
         try:
-            r = _req.get("http://localhost:11434/api/tags", timeout=2)
-            ai_status = "operational" if r.status_code == 200 else "unreachable"
-        except Exception:
-            ai_status = "unreachable"
+            from app.utils.ai_logic import ai_engine
+            ai_status = "operational" if getattr(ai_engine, "gemini_available", False) else "not_configured"
+        except Exception as exc:
+            logger.debug("AI health probe failed: %s", str(exc)[:120])
+            ai_status = "not_configured"
 
-        # WhatsApp API (check config)
-        import os as _os
-        wa_token = _os.getenv("WHATSAPP_TOKEN") or _os.getenv("VERIFY_TOKEN")
-        wa_status = "configured" if wa_token else "not_configured"
+        # WhatsApp API dan osTicket dicek dari settings, tanpa membuka secret ke response.
+        wa_status = "configured" if settings.WHATSAPP_API_TOKEN else "not_configured"
 
-        # osTicket
-        ost_url = _os.getenv("OSTICKET_URL")
-        ost_key = _os.getenv("OSTICKET_API_KEY")
-        ost_status = "configured" if (ost_url and ost_key) else "not_configured"
+        ost_status = "configured" if settings.OSTICKET_API_KEY else "not_configured"
 
         # Knowledge Base
         kb_status = f"loaded_{len(KB_TROUBLESHOOTING)}_categories" if KB_TROUBLESHOOTING else "error"
+        if settings.KB_RAG_ENABLED:
+            try:
+                from app.services.knowledge_base import KnowledgeBaseRetrievalService
+                rag_health = KnowledgeBaseRetrievalService(db).health()
+                kb_status = (
+                    f"rag_{rag_health['documents']}_docs_"
+                    f"{rag_health['chunks']}_chunks_pgvector_{rag_health['pgvector_enabled']}"
+                )
+            except Exception as exc:
+                logger.debug("RAG health probe failed: %s", str(exc)[:120])
 
         return {
             "status": "unhealthy" if has_critical else "healthy",
@@ -1089,4 +1101,3 @@ async def get_activity_log(limit: int = 20, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error getting activity log: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-

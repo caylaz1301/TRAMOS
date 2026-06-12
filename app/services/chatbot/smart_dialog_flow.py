@@ -43,8 +43,13 @@ class SmartDialogFlowHandler:
             "emoji": "🗺️",
             "follow_up": ["Device punya view ke langit?", "GPS sudah di-restart?", "Signal ada?"],
         },
+        "Application": {
+            "keywords": ["aplikasi", "application", "app", "blank screen", "layar kosong", "layar blank", "force close", "crash", "hang", "loading", "tidak bisa dibuka", "menu error", "report tidak muncul"],
+            "emoji": "📱",
+            "follow_up": ["Sudah force close aplikasi?", "Internet stabil?", "Sudah login ulang?"],
+        },
         "Camera": {
-            "keywords": ["kamera", "video", "rekam", "dashboard", "feed", "tampilan", "screen", "display", "cam", "video hitam", "tidak jelas"],
+            "keywords": ["kamera", "dashcam", "video", "rekam", "camera feed", "cam", "video hitam", "kamera hitam", "gambar hitam", "tidak jelas"],
             "emoji": "📹",
             "follow_up": ["Lensa bersih?", "Kabelnya terhubung?", "Power supply OK?"],
         },
@@ -82,6 +87,7 @@ class SmartDialogFlowHandler:
         "device": "Device",
         "vehicle": "Vehicle",
         "app": "Application",
+        "application": "Application",
         "billing": "Billing",
         "ticket": "Ticket",
         "maintenance": "Maintenance",
@@ -113,6 +119,18 @@ class SmartDialogFlowHandler:
         'aja', 'benci', 'jangan', 'skip', 'tidak bisa', 'gabisa', 'enggak bisa'
     }
 
+    SENSITIVE_OUT_OF_SCOPE_PATTERNS = [
+        "password admin",
+        "kata sandi admin",
+        "token admin",
+        "api key",
+        "secret key",
+        "jwt secret",
+        "database password",
+        "hapus data",
+        "drop table",
+    ]
+
     @staticmethod
     def _contains_keyword(text: str, keywords: List[str]) -> bool:
         """Match keywords as words/phrases, not arbitrary substrings.
@@ -124,6 +142,47 @@ class SmartDialogFlowHandler:
         return any(
             re.search(rf'(?<!\w){re.escape(keyword.lower())}(?!\w)', normalized)
             for keyword in keywords
+        )
+
+    @staticmethod
+    def is_sensitive_or_out_of_scope(text: str) -> bool:
+        """Deteksi permintaan yang tidak boleh dijawab chatbot operasional."""
+        normalized = re.sub(r"\s+", " ", (text or "").lower()).strip()
+        return any(pattern in normalized for pattern in SmartDialogFlowHandler.SENSITIVE_OUT_OF_SCOPE_PATTERNS)
+
+    @staticmethod
+    def sensitive_request_response() -> str:
+        """Jawaban aman untuk permintaan password, token, atau aksi destruktif."""
+        return smart_response_system.format_for_whatsapp(
+            "Maaf, saya tidak bisa membantu permintaan password, token, API key, atau akses rahasia.\n\n"
+            "Untuk keamanan TRAMOS, saya hanya bisa membantu:\n"
+            "• Troubleshooting driver/unit\n"
+            "• Panduan penggunaan dashboard\n"
+            "• Pembuatan tiket support jika masalah belum selesai\n\n"
+            "Kalau ada kendala operasional, ceritakan masalahnya dan saya bantu dari SOP resmi."
+        )
+
+    @staticmethod
+    def is_blame_without_evidence_request(text: str) -> bool:
+        """Deteksi permintaan menyalahkan driver tanpa data valid."""
+        normalized = re.sub(r"\s+", " ", (text or "").lower()).strip()
+        blame_terms = ["driver bersalah", "salahkan driver", "bilang driver salah", "langsung bilang driver"]
+        evidence_terms = ["overspeed", "speeding", "melanggar", "kecepatan"]
+        return any(term in normalized for term in blame_terms) and any(term in normalized for term in evidence_terms)
+
+    @staticmethod
+    def blame_without_evidence_response() -> str:
+        """Jawaban aman untuk kasus investigasi yang belum punya bukti lengkap."""
+        return smart_response_system.format_for_whatsapp(
+            "Saya tidak bisa langsung menyatakan driver bersalah tanpa data lengkap.\n\n"
+            "Untuk investigasi overspeed, operator perlu cek dulu:\n"
+            "• Unit atau nomor polisi\n"
+            "• Tanggal dan waktu kejadian\n"
+            "• Lokasi event\n"
+            "• Kecepatan tercatat\n"
+            "• History route sebelum dan sesudah event\n"
+            "• Bukti pendukung seperti camera snapshot/dashcam jika tersedia\n\n"
+            "Jika datanya sudah ada, saya bisa bantu arahkan SOP pengecekannya."
         )
     
     @staticmethod
@@ -457,7 +516,18 @@ class SmartDialogFlowHandler:
     
     @staticmethod
     def _handle_solution_feedback(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
-        """Smart feedback handling — uses keyword search in full sentence, not exact match"""
+        """
+        Handle feedback dari driver setelah mencoba solusi dari KB.
+        Logic penting: tidak langsung anggap selesai jika user bilang "oke/siap/lanjut"
+        karena itu bukan konfirmasi masalah sudah solved.
+
+        Alur:
+        1. Jika input kosong → tanya ulang
+        2. Jika acknowledgment pattern ("oke", "siap") → tanya lagi untuk konfirmasi
+        3. Cek keyword positif ("berhasil", "sudah bisa") → RESOLVED, tidak buat tiket
+        4. Cek keyword negatif ("tidak", "masih error") → COLLECTING_UNIT, mulai eskalasi
+        5. Tidak dikenali → tanya lagi dengan format yang lebih jelas
+        """
         if not user_message:
             return (
                 smart_response_system.format_question(
@@ -470,8 +540,8 @@ class SmartDialogFlowHandler:
         answer = user_message.lower().strip()
         answer_clean = re.sub(r'[!?.,;:]', '', answer).strip()
 
-        # Short acknowledgements are not proof that the issue is fixed.
-        # Ask once more so "oke/siap/lanjut" does not close the case too early.
+        # Penting: acknowledgment seperti "oke", "siap", " lanjut" bukan konfirmasi
+        # masalah sudah solved. Harus tanya lagi untuk memastikan.
         if answer_clean in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS:
             return (
                 smart_response_system.format_question(
@@ -481,14 +551,15 @@ class SmartDialogFlowHandler:
                 DialogState.ASKING_SOLUTION_WORKED
             )
 
-        # ── Positive keywords — check if ANY appear in the full answer ──
+        # Keyword positif - cek jika ADA keyword muncul di jawaban
+        # Penting: "tidak berhasil" mengandung "ya" di "tidak" jadi harus cek negatif duluan
         POSITIVE_KW = [
             'ya', 'yes', 'iya', 'ok', 'oke', 'okeh', 'okay', 'berhasil',
             'solved', 'fixed', 'worked', 'bisa', 'udah bisa', 'sudah bisa',
             'jadi', 'mantap', 'makasih', 'terima kasih', 'bagus', 'done',
             'selesai', 'normal', 'sudah', 'alhamdulillah', 'sukses', 'fix'
         ]
-        # ── Negative keywords ──
+        # Keyword negatif
         NEGATIVE_KW = [
             'tidak berhasil', 'tidak bisa', 'ga bisa', 'gak bisa', 'gabisa',
             'masih error', 'masih sama', 'masih bermasalah', 'masih tidak',
@@ -498,12 +569,13 @@ class SmartDialogFlowHandler:
             'masih', 'belum', 'error', 'salah', 'tidak ada perubahan'
         ]
 
-        # Check negative FIRST (more specific) to avoid false positives like
-        # "tidak berhasil" matching the "ya" in "saya" etc.
+        # Cek negatif duluan untuk avoid false positive
+        # Contoh: "tidak berhasil" mengandung "ya" di "tidak" → harus matched negatif
         is_negative = SmartDialogFlowHandler._contains_keyword(answer, NEGATIVE_KW)
         is_positive = SmartDialogFlowHandler._contains_keyword(answer, POSITIVE_KW) and not is_negative
 
         if is_positive:
+            # Solusi berhasil - tidak buat tiket
             session.solution_worked = True
             logger.info(f"✅ Solution worked! User said: {user_message[:50]}")
             msg = smart_response_system.format_success_message(
@@ -513,6 +585,7 @@ class SmartDialogFlowHandler:
             return (msg, DialogState.RESOLVED)
 
         elif is_negative:
+            # Solusi gagal - mulai eskalasi ke tim support
             logger.info(f"❌ Solution didn't work, escalating... User said: {user_message[:50]}")
             msg = (
                 "Baik, saya akan eskalasi ke tim teknisi kami.\n\n"
@@ -526,7 +599,7 @@ class SmartDialogFlowHandler:
             return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
 
         else:
-            # Truly unrecognized — ask once more with clearer framing
+            # Tidak dikenali - tanya lagi dengan framing yang lebih jelas
             msg = smart_response_system.format_question(
                 "Maaf, saya belum mengerti jawaban Anda.\nApakah solusi tadi berhasil memperbaiki masalahnya?",
                 ["✅ Ya, berhasil!", "❌ Tidak, masih error"]

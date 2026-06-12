@@ -105,7 +105,8 @@ def init_production_database(database_url: str, reset: bool = False):
             logger.info(f"  Port:     {parsed.port}")
             logger.info(f"  Database: {parsed.path.lstrip('/')}")
             logger.info(f"  User:     {parsed.username}")
-        except:
+        except Exception as exc:
+            logger.debug("Could not parse database URL for display: %s", exc)
             logger.info(f"  URL: {database_url}")
         
         logger.info("-" * 70)
@@ -136,7 +137,7 @@ def init_production_database(database_url: str, reset: bool = False):
             "1. Set up environment variables (.env file)",
             "2. Configure WhatsApp Business API credentials",
             "3. Configure osTicket API credentials",
-            "4. Configure Gemini AI API credentials (or local Ollama)",
+            "4. Configure Gemini AI API credentials",
             "5. Run application with: python main.py",
             "6. Test WhatsApp integration with test_twilio_setup.py",
         ]

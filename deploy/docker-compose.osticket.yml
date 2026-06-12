@@ -1,0 +1,80 @@
+name: tramos
+
+services:
+  osticket-db:
+    image: mariadb:10.11
+    container_name: tramos-osticket-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${OSTICKET_DB_ROOT_PASSWORD:?set in env.osticket.production}
+      MARIADB_DATABASE: ${OSTICKET_DB_NAME:-osticket}
+      MARIADB_USER: ${OSTICKET_DB_USER:-osticket}
+      MARIADB_PASSWORD: ${OSTICKET_DB_PASSWORD:?set in env.osticket.production}
+    volumes:
+      - tramos_osticket_db_data:/var/lib/mysql
+      - ${OSTICKET_DB_DUMP_PATH:-/opt/tramos/.deploy/osticket/osticket.sql.gz}:/docker-entrypoint-initdb.d/00-osticket.sql.gz:ro
+      - ${OSTICKET_API_SQL_PATH:-/opt/tramos/.deploy/osticket/01-api-network.sql}:/docker-entrypoint-initdb.d/01-api-network.sql:ro
+    networks:
+      tramos_osticket:
+        ipv4_address: 172.29.0.30
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "healthcheck.sh --connect --innodb_initialized || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  osticket:
+    build:
+      context: ..
+      dockerfile: deploy/osticket.Dockerfile
+    image: tramos-osticket:1.18.3
+    container_name: tramos-osticket
+    restart: unless-stopped
+    env_file:
+      - ${OSTICKET_ENV_FILE:-./env.osticket.production}
+    ports:
+      - "0.0.0.0:${TRAMOS_OSTICKET_HOST_PORT:-30081}:80"
+    volumes:
+      - ${OSTICKET_SOURCE_PATH:-/opt/tramos/osticket}:/var/www/html
+    networks:
+      tramos_osticket:
+        ipv4_address: 172.29.0.20
+    depends_on:
+      osticket-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php -r \"exit(@file_get_contents('http://127.0.0.1/') === false ? 1 : 0);\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+
+  backend:
+    environment:
+      OSTICKET_BASE_URL: http://osticket/api
+      OSTICKET_API_URL: http://osticket/api
+      OSTICKET_API_KEY: ${OSTICKET_API_KEY:?set in env.osticket.production}
+    networks:
+      default:
+      tramos_osticket:
+        ipv4_address: 172.29.0.10
+    depends_on:
+      osticket:
+        condition: service_healthy
+
+networks:
+  tramos_osticket:
+    name: tramos_osticket
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  tramos_osticket_db_data:

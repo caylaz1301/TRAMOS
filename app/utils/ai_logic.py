@@ -1,42 +1,27 @@
-"""AI-based logic for troubleshooting and intent detection - Google Gemini Version (ENHANCED)
-Now with:
-- Google Gemini API (gemini-2.0-flash) replacing Ollama/Mistral
-- Semantic KB matching (instead of keyword-only)
-- User profile personalization
-- Solution effectiveness tracking
-- Smart prompt engineering
-- Adaptive dialog flow
-"""
+"""Logic AI untuk deteksi intent dan troubleshooting TRAMOS berbasis LLM."""
 import logging
 from typing import Tuple, Optional, Dict, Any
 import json
-import requests
-from datetime import datetime
 
 import google.generativeai as genai
 
 from app.config import settings
+from app.services.llm_client import create_llm_client
 from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
 from app.utils.semantic_kb_matcher import SemanticKBMatcher
 from app.utils.user_profile_manager import UserProfileManager
 from app.utils.solution_effectiveness_tracker import SolutionEffectivenessTracker, SolutionOutcome
 from app.utils.smart_prompt_engineer import SmartPromptEngineer
-from app.utils.dialog_flow_engine import AdaptiveDialogFlowEngine, AdaptiveDialogState
 
 logger = logging.getLogger(__name__)
 
-# ── Ollama Configuration (DISABLED - switched to Gemini) ──
-# OLLAMA_API_URL = "http://localhost:11434/api/generate"
-# OLLAMA_MODEL = "mistral"
-# OLLAMA_TIMEOUT = 30
-
-# ── Google Gemini Configuration ──
+# ── Konfigurasi LLM ──
 GEMINI_MODEL = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
 GEMINI_TIMEOUT = 30  # seconds
 
 
 class AITroubleshootingEngine:
-    """AI-powered troubleshooting with LLM support (Google Gemini API) - ENHANCED VERSION
+    """AI-powered troubleshooting with configurable LLM support - ENHANCED VERSION
     
     Now includes:
     - Google Gemini 2.0 Flash as LLM backend ✨ UPDATED
@@ -48,25 +33,16 @@ class AITroubleshootingEngine:
     """
     
     def __init__(self):
-        """Initialize AI engine with Gemini and all enhancements"""
+        """Initialize AI engine with configured LLM provider and all enhancements"""
         self.use_llm = settings.USE_LLM
         self.fallback_count = 0
         
-        # ── Configure Gemini API ──
-        gemini_api_key = getattr(settings, 'GEMINI_API_KEY', '')
-        self.gemini_available = False
-        if gemini_api_key:
-            try:
-                genai.configure(api_key=gemini_api_key)
-                self.gemini_client = genai.GenerativeModel(GEMINI_MODEL)
-                self.gemini_available = True
-                logger.info(f"✅ Google Gemini API initialized: {GEMINI_MODEL}")
-            except Exception as e:
-                logger.error(f"❌ Gemini init failed: {e}")
-                self.gemini_client = None
-        else:
-            self.gemini_client = None
-            logger.warning("⚠️ GEMINI_API_KEY not set. Falling back to keyword matching.")
+        # ── Configure LLM provider ──
+        self.llm_client = create_llm_client("ai-troubleshooting")
+        self.gemini_client = self.llm_client
+        self.gemini_available = self.llm_client.available
+        if not self.gemini_available:
+            logger.warning("⚠️ LLM unavailable. Falling back to keyword matching.")
         
         # ✨ Initialize semantic matcher
         self.semantic_matcher = SemanticKBMatcher()
@@ -79,17 +55,17 @@ class AITroubleshootingEngine:
         
         # ✨ Initialize smart prompt engineer
         self.prompt_engineer = SmartPromptEngineer()
-        
-        # ✨ Initialize dialog flow engine
-        self.dialog_flow = AdaptiveDialogFlowEngine(self.semantic_matcher)
-        
+
         if self.use_llm and self.gemini_available:
-            logger.info("✅ Gemini LLM ready with semantic matching, user profiling, and adaptive dialog flow")
+            logger.info(
+                "✅ %s LLM ready with semantic matching, user profiling, and adaptive dialog flow",
+                self.llm_client.provider,
+            )
         elif self.use_llm:
-            logger.warning("⚠️ Gemini unavailable. Falling back to keyword matching.")
+            logger.warning("⚠️ LLM unavailable. Falling back to keyword matching.")
             self.use_llm = False
     
-    # ── _check_ollama_connection removed (Ollama disabled, using Gemini) ──
+    # Koneksi Gemini dicek saat inisialisasi; tidak ada health probe blocking di setiap request.
     
     # Knowledge base categories derived from KB_TROUBLESHOOTING (single source of truth)
     @property
@@ -101,7 +77,7 @@ class AITroubleshootingEngine:
         return {cat: data.get("keywords", []) for cat, data in KB_TROUBLESHOOTING.items()}
     
     def _detect_intent_with_gemini(self, message: str, context: Optional[str] = None) -> Tuple[str, Optional[str], Dict[str, Any]]:
-        """Use Google Gemini API to detect intent - replaces Ollama"""
+        """Deteksi intent menggunakan Google Gemini API."""
         try:
             context_section = f"\n\nPrevious context: {context}" if context else ""
             
@@ -368,7 +344,7 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
         
         Returns: {status, steps, semantic_match_score, kb_solutions, etc}
         """
-        if not self.use_llm or not self.ollama_available:
+        if not self.use_llm or not self.gemini_available:
             return {"status": "no_ai", "steps": []}
         
         try:
@@ -667,4 +643,3 @@ Be precise. Don't hallucinate. If unsure, say so in the output."""
 
 # Singleton instance
 ai_engine = AITroubleshootingEngine()
-

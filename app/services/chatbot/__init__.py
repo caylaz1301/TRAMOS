@@ -10,15 +10,13 @@ This module handles all WhatsApp chatbot functionality:
 - WhatsApp message sending/receiving
 
 Key Classes:
-- DialogFlowHandler: Main dialog flow orchestrator
-- SmartDialogFlowHandler: AI-powered smart responses
+- SmartDialogFlowHandler: AI-powered smart responses (main dialog orchestrator)
 - ConversationSession: Multi-turn session management
 - ProblemExtractor: Problem extraction and categorization
 - SolutionSearcher: KB search and matching
 - WhatsAppService: WhatsApp Cloud API integration
 """
 
-from .dialog_flow_handler import DialogFlowHandler
 from .smart_dialog_flow import SmartDialogFlowHandler
 from .session_manager import ConversationSession, DialogState, SessionManager
 from .nlp_extractor import ProblemExtractor, problem_extractor
@@ -26,7 +24,6 @@ from .solution_searcher import SolutionSearcher, solution_searcher
 from .whatsapp_service import WhatsAppService
 
 __all__ = [
-    "DialogFlowHandler",
     "SmartDialogFlowHandler",
     "ConversationSession",
     "DialogState",

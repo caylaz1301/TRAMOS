@@ -1,18 +1,36 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:16
-    container_name: tramos_postgres
+    image: pgvector/pgvector:pg15
+    container_name: tramos-postgres
     restart: unless-stopped
     environment:
+      POSTGRES_DB: tramos_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: tramos_db
     ports:
       - "5434:5432"
     volumes:
-      - tramos_pgdata:/var/lib/postgresql/data
+      - tramos_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d tramos_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: tramos-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - tramos_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  tramos_pgdata:
+  tramos_postgres_data:
+  tramos_redis_data:

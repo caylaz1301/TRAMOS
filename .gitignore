@@ -34,6 +34,11 @@ ENV/
 .env
 .env.local
 .env.*.local
+node_modules/
+deploy/env.production
+deploy/.env
+deploy/env.osticket.production
+.deploy/
 
 # IDE
 .idea/

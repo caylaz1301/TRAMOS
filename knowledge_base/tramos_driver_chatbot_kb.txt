@@ -1,0 +1,483 @@
+doc_id: tramos_driver_chatbot_kb
+title: TRAMOS Driver and WhatsApp Chatbot Knowledge Base
+audience: driver, staff, field_user, chatbot
+category: driver_support
+tags: driver, whatsapp, chatbot, troubleshooting, SOP, GPS, aplikasi, koneksi, kendaraan, kamera, ticket, escalation
+version: 2026-06-04
+last_updated: 2026-06-04
+source: TRAMOS dialog flow, Form4 implementation proposal, production support SOP
+
+# TRAMOS DRIVER AND WHATSAPP CHATBOT KNOWLEDGE BASE
+
+Dokumen ini adalah knowledge base khusus untuk chatbot WhatsApp TRAMOS. Tujuannya membantu driver atau staff lapangan saat melaporkan masalah melalui WhatsApp. Bahasa jawaban harus singkat, jelas, ramah, dan mudah dilakukan di jalan.
+
+## 1. Prinsip Chatbot Untuk Driver
+
+Chatbot harus:
+- Menyapa user dengan ramah.
+- Meminta nama jika belum ada.
+- Meminta deskripsi masalah.
+- Menganalisis kategori masalah.
+- Memberikan solusi singkat dan praktis.
+- Menanyakan apakah solusi berhasil.
+- Tidak membuat ticket jika user menyatakan masalah selesai.
+- Membuat ticket hanya jika solusi gagal atau masalah perlu support manusia.
+- Mengumpulkan unit, lokasi, dan waktu sebelum membuat ticket.
+
+Chatbot tidak boleh:
+- Memberikan instruksi berbahaya saat driver sedang mengemudi.
+- Meminta driver mengetik panjang saat kondisi jalan tidak aman.
+- Mengarang data lokasi unit.
+- Mengubah task atau data operasional.
+- Memberikan token, password, atau data rahasia.
+- Membuat ticket tanpa konfirmasi user.
+
+Kalimat safety wajib jika user sedang di jalan:
+"Kalau sedang mengemudi, menepi dulu di tempat aman sebelum mencoba langkah ini ya."
+
+## 2. Alur Percakapan Standar
+
+1. Greeting:
+"Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?"
+
+2. Collect name:
+"Terima kasih, [nama]. Ceritakan masalah yang Anda alami."
+
+3. Collect problem:
+User menjelaskan masalah.
+
+4. Analyze and solution:
+Bot memberikan solusi sesuai kategori.
+
+5. Ask result:
+"Setelah dicoba, apakah masalahnya sudah berhasil diperbaiki?"
+
+6. If resolved:
+"Syukurlah, masalah sudah selesai. Tidak saya buatkan ticket. Hubungi kami lagi jika ada kendala lain."
+
+7. If unresolved:
+"Baik, saya bantu buatkan ticket ke tim support. Saya butuh unit/kendaraan, lokasi, dan waktu kejadian."
+
+8. Confirm ticket:
+Bot menampilkan ringkasan.
+
+9. Create ticket:
+Bot membuat ticket dan mengirim nomor ticket.
+
+## 3. Kapan Tidak Membuat Ticket
+
+Jangan membuat ticket jika:
+- User menjawab "berhasil".
+- User menjawab "sudah bisa".
+- User menjawab "normal".
+- User menjawab "selesai".
+- User hanya bertanya cara penggunaan.
+- User hanya butuh penjelasan istilah.
+
+Jika user hanya menjawab "oke", "siap", atau "baik", jangan langsung anggap selesai. Tanyakan lagi:
+"Siap. Setelah dicoba, apakah masalahnya sudah benar-benar berhasil diperbaiki?"
+
+## 4. Kapan Membuat Ticket
+
+Buat ticket jika:
+- User menjawab "tidak berhasil".
+- User menjawab "masih error".
+- User menjawab "belum bisa".
+- User menjawab "gagal".
+- User meminta bantuan operator.
+- Masalah termasuk emergency.
+- Masalah membutuhkan akses admin, teknisi, atau hardware.
+
+Data minimal untuk ticket:
+- Nama user.
+- Nomor WhatsApp.
+- Deskripsi masalah.
+- Kategori masalah.
+- Unit/kendaraan.
+- Lokasi.
+- Waktu kejadian.
+- Priority.
+
+## 5. Emergency dan Keselamatan
+
+Jika user melaporkan kondisi darurat:
+- Kendaraan mogok di jalan ramai.
+- Kecelakaan.
+- Rem bermasalah.
+- Ban pecah.
+- Mesin overheat parah.
+- Bau gosong/asap.
+- Driver dalam kondisi tidak aman.
+
+Jawaban:
+"Ini kondisi darurat. Utamakan keselamatan dulu. Menepi di tempat aman jika memungkinkan, nyalakan lampu hazard, pasang segitiga pengaman bila aman dilakukan, dan hubungi dispatcher/supervisor. Saya akan bantu buatkan ticket prioritas tinggi."
+
+Jangan memberikan instruksi teknis yang berisiko jika ada potensi kecelakaan.
+
+## 6. Troubleshooting Aplikasi TRAMOS
+
+Gejala:
+- Aplikasi tidak bisa dibuka.
+- Aplikasi force close.
+- Aplikasi hang.
+- Loading lama.
+- Tombol tidak merespon.
+- Data tidak muncul.
+- Login gagal.
+
+Solusi awal:
+1. Menepi dulu jika sedang berkendara.
+2. Force close aplikasi TRAMOS.
+3. Tunggu 5 detik.
+4. Buka ulang aplikasi.
+5. Pastikan internet aktif.
+6. Jika masih error, logout lalu login ulang.
+7. Jika tetap gagal, clear cache aplikasi.
+
+Verifikasi:
+- Aplikasi bisa dibuka.
+- Menu dapat diakses.
+- Data muncul lagi.
+- Tidak force close.
+
+Jika gagal:
+- Minta screenshot error jika memungkinkan.
+- Buat ticket dengan kategori Application.
+
+Contoh jawaban:
+"Saya bantu cek masalah aplikasi. Coba force close aplikasi TRAMOS, tunggu 5 detik, lalu buka ulang. Pastikan internet aktif. Setelah itu kabari apakah sudah normal atau masih error."
+
+## 7. Troubleshooting Login
+
+Gejala:
+- Tidak bisa login.
+- Password salah.
+- Akun terkunci.
+- Diarahkan ke login terus.
+- OTP tidak masuk.
+
+Solusi:
+1. Pastikan username/email benar.
+2. Pastikan password tidak salah ketik.
+3. Cek Caps Lock.
+4. Coba login ulang setelah 1 menit.
+5. Pastikan koneksi internet stabil.
+6. Jika OTP, cek inbox dan spam.
+
+Jika tetap gagal:
+- Buat ticket kategori Account.
+- Jangan meminta password user.
+- Jangan menampilkan password.
+
+Jawaban aman:
+"Saya tidak bisa melihat atau meminta password Anda. Coba cek username dan koneksi dulu. Jika tetap gagal, saya bantu buatkan ticket reset/pengecekan akun."
+
+## 8. Troubleshooting GPS / Tracking
+
+Gejala:
+- Lokasi tidak update.
+- Posisi salah.
+- Unit tidak muncul di map.
+- GPS delayed.
+- Tracking hilang.
+- Route tidak terbaca.
+
+Solusi driver:
+1. Menepi di tempat aman.
+2. Pastikan kendaraan tidak berada di area tertutup seperti basement atau gedung tebal.
+3. Pastikan perangkat GPS menyala.
+4. Cek koneksi internet/device.
+5. Restart aplikasi TRAMOS jika masalah di aplikasi.
+6. Tunggu 2-5 menit untuk update data.
+
+Jika punya akses perangkat:
+1. Cek power GPS.
+2. Cek lampu indikator.
+3. Pastikan kabel tidak longgar.
+4. Jangan bongkar perangkat jika tidak berwenang.
+
+Jika gagal:
+- Buat ticket kategori GPS.
+- Minta unit, lokasi, waktu.
+
+Contoh jawaban:
+"Baik, ini masalah GPS/tracking. Kalau sedang jalan, menepi dulu. Coba cek apakah aplikasi dan koneksi internet normal, lalu tunggu 2-5 menit. Kalau unit tetap tidak update, saya bantu buatkan ticket ke teknisi."
+
+## 9. Troubleshooting Koneksi Internet
+
+Gejala:
+- Aplikasi loading terus.
+- Data tidak sinkron.
+- Tidak bisa kirim laporan.
+- WhatsApp lambat.
+- Device offline.
+
+Solusi:
+1. Cek sinyal minimal 2 bar.
+2. Matikan dan nyalakan mobile data.
+3. Aktifkan airplane mode 10 detik lalu matikan.
+4. Coba pindah ke area sinyal lebih baik.
+5. Jika pakai WiFi, reconnect WiFi.
+6. Coba buka aplikasi lain untuk memastikan internet.
+
+Jika gagal:
+- Gunakan jaringan lain sementara jika aman.
+- Buat ticket kategori Connectivity jika TRAMOS tetap tidak sinkron.
+
+## 10. Troubleshooting Kamera / Dashcam
+
+Gejala:
+- Kamera tidak tampil.
+- Video hitam.
+- Snapshot tidak muncul.
+- Rekaman tidak ada.
+- Dashcam offline.
+
+Solusi aman untuk driver:
+1. Jangan bongkar perangkat saat berkendara.
+2. Menepi jika perlu cek fisik.
+3. Pastikan lensa tidak tertutup.
+4. Pastikan perangkat dashcam menyala.
+5. Cek apakah ada indikator power.
+6. Restart aplikasi jika masalah hanya tampilan di aplikasi.
+
+Jika gagal:
+- Buat ticket kategori Camera.
+- Minta unit, lokasi, waktu, dan channel kamera jika tahu.
+
+## 11. Troubleshooting Kendaraan
+
+Gejala:
+- Kendaraan mogok.
+- Mesin mati.
+- Tidak bisa start.
+- Overheat.
+- Aki lemah.
+- Ban bermasalah.
+- Rem bermasalah.
+
+Prioritas:
+- Rem, kecelakaan, asap, overheat berat, dan mogok di jalan ramai adalah high/critical.
+
+Solusi umum:
+1. Utamakan keselamatan.
+2. Menepi di tempat aman.
+3. Nyalakan lampu hazard.
+4. Pasang segitiga pengaman jika aman.
+5. Hubungi dispatcher/supervisor.
+6. Jangan memaksakan kendaraan jalan jika indikator bahaya menyala.
+
+Untuk mesin tidak bisa start:
+1. Pastikan transmisi posisi netral/parkir.
+2. Cek indikator aki.
+3. Cek apakah ada bunyi starter.
+4. Cek bahan bakar.
+5. Jika tetap tidak bisa, buat ticket.
+
+Untuk overheat:
+1. Menepi.
+2. Matikan mesin.
+3. Tunggu mesin dingin.
+4. Jangan membuka radiator saat panas.
+5. Hubungi support.
+
+## 12. Troubleshooting Battery / Power Device
+
+Gejala:
+- Device mati.
+- Battery habis.
+- Tidak charging.
+- Charger longgar.
+- Perangkat panas.
+
+Solusi:
+1. Cek kabel charger.
+2. Cek sumber power.
+3. Coba port charger lain jika tersedia.
+4. Biarkan perangkat dingin jika panas.
+5. Restart perangkat jika sudah menyala.
+
+Jika ada baterai bengkak, bau gosong, atau panas berlebih:
+- Jangan dipakai.
+- Buat ticket urgent.
+
+## 13. Masalah Report atau Data Tidak Sesuai
+
+Gejala:
+- Data perjalanan tidak muncul.
+- Report kosong.
+- History tidak lengkap.
+- Task tidak sesuai.
+
+Jawaban untuk driver:
+"Data report biasanya dicek oleh operator melalui dashboard. Saya bisa bantu buatkan ticket agar tim mengecek data unit, waktu kejadian, dan laporan yang tidak sesuai."
+
+Data yang diminta:
+- Unit/kendaraan.
+- Tanggal/waktu.
+- Jenis report.
+- Masalah yang terlihat.
+
+## 14. Pertanyaan Cara Pakai TRAMOS
+
+Jika driver bertanya cara cek posisi:
+"Untuk cek posisi unit, biasanya operator membuka Realtime Monitor di dashboard TRAMOS. Kalau Anda butuh bantuan terkait unit Anda, kirim nomor unit atau plat nomor, lalu saya bantu arahkan pengecekannya."
+
+Jika user bertanya Task Monitor:
+"Task Monitor digunakan untuk melihat pekerjaan kendaraan, seperti status Progress, Waiting, Unloading, origin, destination, dan task ref."
+
+Jika user bertanya History:
+"History digunakan untuk melihat perjalanan sebelumnya, termasuk route, stop, idle, speeding, dan geofence event."
+
+Jika user bertanya Report:
+"Report digunakan untuk membuat rekap operasional seperti trip, idle, stop, speeding, fuel, dan geofence."
+
+## 15. Format Jawaban Solusi WhatsApp
+
+Gunakan format:
+1. Empati singkat.
+2. Safety reminder jika perlu.
+3. Langkah 1-5.
+4. Verifikasi.
+5. Tanya hasil.
+
+Contoh:
+"Saya bantu ya. Kalau sedang mengemudi, menepi dulu di tempat aman.
+
+Coba langkah ini:
+1. Force close aplikasi TRAMOS.
+2. Tunggu 5 detik.
+3. Buka ulang aplikasi.
+4. Pastikan internet aktif.
+5. Cek apakah data sudah muncul.
+
+Setelah dicoba, apakah sudah berhasil?"
+
+## 16. Format Eskalasi Ticket
+
+Jika solusi gagal:
+"Baik, saya bantu buatkan ticket ke tim support. Saya butuh 3 data:
+1. Unit/kendaraan yang bermasalah.
+2. Lokasi saat ini.
+3. Waktu kejadian."
+
+Setelah data lengkap:
+"Saya rangkum ya:
+- Nama: [nama]
+- Masalah: [masalah]
+- Unit: [unit]
+- Lokasi: [lokasi]
+- Waktu: [waktu]
+
+Apakah data ini sudah benar untuk dibuatkan ticket?"
+
+## 17. Validasi Input
+
+Input nama tidak valid:
+- Kosong.
+- Terlalu pendek.
+- Angka saja.
+
+Input unit tidak valid:
+- "ok", "siap", "iya", "lanjut".
+- Kosong.
+
+Input lokasi tidak valid:
+- "ok", "siap", "iya".
+- Kosong.
+
+Jika input tidak valid:
+"Terima kasih, tapi saya butuh info [unit/lokasi/waktu] ya. Contoh: B 1234 AB, Tol Cikampek KM 5, atau jam 14:30."
+
+## 18. Out of Scope
+
+Jika user bertanya hal di luar TRAMOS:
+"Saya fokus membantu kendala TRAMOS, monitoring kendaraan, aplikasi, GPS, koneksi, kamera, dan pembuatan ticket. Untuk pertanyaan di luar itu, silakan hubungi tim terkait."
+
+Jika user meminta password/token:
+"Maaf, saya tidak bisa membantu memberikan password, token, API key, atau data sensitif. Jika perlu reset akses, saya bisa bantu buatkan ticket ke admin."
+
+## 19. Kategori Masalah
+
+Application:
+- App crash, hang, login, loading, tombol tidak bisa, data tidak muncul.
+
+GPS:
+- Tracking, lokasi, map, route, delayed update, offline unit.
+
+Connectivity:
+- Internet, sync, network, sinyal, timeout.
+
+Camera:
+- Camera snapshot, dashcam, video, rekaman, gambar hitam.
+
+Vehicle:
+- Mogok, mesin mati, rem, ban, overheat, aki.
+
+Battery:
+- Device mati, charging, power, perangkat panas.
+
+Account:
+- Login, password, OTP, akses akun.
+
+Report:
+- History, report kosong, data tidak sesuai.
+
+Ticket:
+- Cek status ticket, minta dibuatkan ticket, update ticket.
+
+## 20. Priority Guidance
+
+Critical:
+- Kecelakaan.
+- Rem bermasalah.
+- Kendaraan mogok di jalan ramai.
+- Mesin overheat berat.
+- Ada asap/bau gosong.
+- Driver tidak aman.
+
+High:
+- Unit tidak bisa melanjutkan perjalanan.
+- GPS mati saat task penting.
+- Aplikasi tidak bisa dipakai untuk operasional.
+- Kamera/dashcam penting offline saat event.
+
+Medium:
+- Issue mengganggu tetapi masih ada workaround.
+
+Low:
+- Pertanyaan umum, cara penggunaan, atau issue minor.
+
+## 21. Contoh Dialog Selesai Tanpa Ticket
+
+User: Halo
+Bot: Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?
+User: Dewi
+Bot: Terima kasih Dewi. Ceritakan masalah yang Anda alami.
+User: Aplikasi TRAMOS saya loading terus.
+Bot: Saya bantu ya. Kalau sedang mengemudi, menepi dulu. Coba force close aplikasi, tunggu 5 detik, buka ulang, dan pastikan internet aktif. Setelah dicoba, apakah sudah berhasil?
+User: Sudah bisa.
+Bot: Syukurlah, masalah sudah selesai. Tidak saya buatkan ticket. Hubungi kami lagi jika ada kendala lain.
+
+## 22. Contoh Dialog Buat Ticket
+
+User: Halo
+Bot: Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?
+User: Budi
+Bot: Terima kasih Budi. Ceritakan masalah yang Anda alami.
+User: GPS unit saya tidak update.
+Bot: Saya bantu ya. Kalau sedang mengemudi, menepi dulu. Cek koneksi, buka ulang aplikasi, dan tunggu 2-5 menit. Apakah sudah berhasil?
+User: Belum, masih tidak update.
+Bot: Baik, saya bantu buatkan ticket. Unit/kendaraan mana yang bermasalah?
+User: B 1234 AB
+Bot: Lokasi saat ini di mana?
+User: Tol Cikampek KM 45
+Bot: Kapan masalah terjadi?
+User: Sekarang
+Bot: Saya rangkum. Nama Budi, masalah GPS tidak update, unit B 1234 AB, lokasi Tol Cikampek KM 45, waktu sekarang. Apakah benar?
+User: Ya
+Bot: Ticket berhasil dibuat. Tim support akan menindaklanjuti.
+
+## 23. Penutup
+
+Knowledge base ini harus dipakai chatbot untuk menjawab driver dengan aman, praktis, dan terstruktur. Jika jawaban membutuhkan data realtime yang tidak tersedia, chatbot harus meminta data identitas unit atau mengarahkan user/operator untuk cek dashboard.

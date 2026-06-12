@@ -11,7 +11,7 @@
 .sidebar {
   width: var(--sidebar-width);
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--bg-card);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -89,7 +89,7 @@
 }
 
 .nav-item:hover {
-  background: #f3f4f6;
+  background: var(--bg-card-hover);
   color: var(--text-primary);
 }
 
@@ -173,6 +173,26 @@
 .user-role {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Theme Toggle Button */
+.btn-theme {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--t-fast);
+  flex-shrink: 0;
+}
+
+.btn-theme:hover {
+  background: var(--bg-surface);
+  color: var(--accent);
 }
 
 .btn-logout {

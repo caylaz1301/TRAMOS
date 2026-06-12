@@ -1,9 +1,4 @@
-"""
-TRAMOS AI Support System
-Main FastAPI application entry point
-
-AI-powered WhatsApp support system for fleet management
-"""
+"""Entry point FastAPI untuk TRAMOS AI Support System."""
 
 import logging
 from typing import Optional
@@ -12,9 +7,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.config import settings
-from app.routes import tickets, whatsapp, analytics, auth
+from app.routes import tickets, whatsapp, analytics, auth, kb
 from app.database_models import DatabaseManager
 from app.services.chatbot.session_manager import init_session_manager
 from app.services.database_tracker import init_db_tracker
@@ -55,6 +51,8 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 50)
     logger.info(f"Debug mode: {settings.DEBUG}")
     logger.info(f"Webhook: {settings.WEBHOOK_PATH}")
+    for warning in settings.production_warnings():
+        logger.warning("Production config warning: %s", warning)
     
     # Initialize database
     try:
@@ -113,6 +111,7 @@ app.include_router(tickets.router)
 app.include_router(whatsapp.router)
 app.include_router(analytics.router)
 app.include_router(auth.router)
+app.include_router(kb.router)
 
 
 # ============================================================================
@@ -132,7 +131,7 @@ def get_db_session():
 
 @app.get("/", tags=["system"])
 async def root():
-    """Root endpoint - API information"""
+    """Informasi singkat API untuk sanity check manual."""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -148,7 +147,7 @@ async def root():
 
 @app.get("/health", tags=["system"])
 async def health_check():
-    """Enhanced health check endpoint for monitoring - checks all system components"""
+    """Health check lengkap untuk monitoring dashboard dan readiness demo."""
     from app.utils.ai_logic import ai_engine
     
     health_status = {
@@ -159,19 +158,22 @@ async def health_check():
         "components": {}
     }
     
-    # Check database
+    # Database dianggap sehat jika query sederhana berhasil dieksekusi.
     db_status = "connected"
     try:
         if not db_manager:
             db_status = "not_configured"
         else:
             session = db_manager.get_session()
-            session.close()
+            try:
+                session.execute(text("SELECT 1"))
+            finally:
+                session.close()
     except Exception as e:
         db_status = f"error: {str(e)[:30]}"
     health_status["components"]["database"] = db_status
     
-    # Check AI engine (Gemini)
+    # Gemini tidak dipanggil live agar endpoint health tetap ringan.
     ai_status = "unknown"
     try:
         if ai_engine:
@@ -180,20 +182,31 @@ async def health_check():
         ai_status = "not_configured"
     health_status["components"]["ai_engine"] = ai_status
     
-    # Check WhatsApp API configuration
     whatsapp_status = "configured" if settings.WHATSAPP_API_TOKEN else "not_configured"
     health_status["components"]["whatsapp_api"] = whatsapp_status
     
-    # Check osTicket configuration
     osticket_status = "configured" if settings.OSTICKET_API_KEY else "not_configured"
     health_status["components"]["osticket"] = osticket_status
     
-    # Check KB system
+    # RAG dicek dari metadata database; fallback KB tetap dilaporkan jika RAG belum siap.
     kb_status = "loaded"
     try:
         from app.utils.kb_troubleshooting import KB_TROUBLESHOOTING
-        kb_status = f"loaded ({len(KB_TROUBLESHOOTING)} solutions)"
-    except:
+        kb_status = f"fallback loaded ({len(KB_TROUBLESHOOTING)} solutions)"
+        if settings.KB_RAG_ENABLED and db_manager:
+            from app.services.knowledge_base import KnowledgeBaseRetrievalService
+
+            session = db_manager.get_session()
+            try:
+                rag_health = KnowledgeBaseRetrievalService(session).health()
+                kb_status = (
+                    f"rag enabled ({rag_health['documents']} docs, "
+                    f"{rag_health['chunks']} chunks, pgvector={rag_health['pgvector_enabled']})"
+                )
+            finally:
+                session.close()
+    except Exception as exc:
+        logger.warning("Knowledge base health check failed: %s", str(exc)[:160])
         kb_status = "error"
     health_status["components"]["knowledge_base"] = kb_status
     
@@ -206,16 +219,19 @@ async def health_check():
 
 @app.get("/config/status", tags=["system"])
 async def config_status():
-    """Check configuration status of all services"""
+    """Status konfigurasi aman untuk dashboard; tidak mengembalikan secret."""
     return {
         "debug": settings.DEBUG,
+        "environment": settings.ENVIRONMENT,
         "services": {
             "osticket": bool(settings.OSTICKET_API_KEY),
             "whatsapp": bool(settings.WHATSAPP_API_TOKEN),
             "database": bool(db_manager),
-            "ai_engine": "ollama_local",
+            "ai_engine": settings.GEMINI_MODEL,
+            "knowledge_base_rag": settings.KB_RAG_ENABLED,
         },
         "webhook_path": settings.WEBHOOK_PATH,
+        "production_warnings": settings.production_warnings(),
     }
 
 

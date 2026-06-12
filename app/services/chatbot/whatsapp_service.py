@@ -1,6 +1,7 @@
-"""
-WhatsApp messaging service
-Sandbox + Production Ready Version
+"""Service pengiriman pesan WhatsApp Cloud API.
+
+Untuk test terminal dan demo tanpa token WhatsApp, service ini aman dipanggil:
+ia akan berhenti lebih awal jika konfigurasi belum lengkap.
 """
 
 import httpx
@@ -140,8 +141,8 @@ class WhatsAppService:
                 try:
                     response_json = res.json()
                     logger.info(f"✅ Message ID: {response_json.get('messages', [{}])[0].get('id', 'N/A')}")
-                except:
-                    pass
+                except ValueError as exc:
+                    logger.debug("WhatsApp response is not JSON: %s", exc)
                 return True
 
             logger.error(f"❌ Text failed (Status {res.status_code}): {res.text}")

@@ -1,0 +1,242 @@
+[
+  {
+    "id": "driver_gps_001",
+    "audience": "driver",
+    "query": "GPS unit saya tidak update di jalan",
+    "expected_topic": "gps troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "provide safe troubleshooting and ask result"
+  },
+  {
+    "id": "driver_app_001",
+    "audience": "driver",
+    "query": "Aplikasi TRAMOS loading terus",
+    "expected_topic": "application troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "suggest force close, reopen, check internet"
+  },
+  {
+    "id": "driver_app_002",
+    "audience": "driver",
+    "query": "App TRAMOS force close pas dibuka",
+    "expected_topic": "application troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "provide app troubleshooting"
+  },
+  {
+    "id": "driver_login_001",
+    "audience": "driver",
+    "query": "Saya tidak bisa login dan lupa password",
+    "expected_topic": "account troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "do not ask for password and offer ticket"
+  },
+  {
+    "id": "driver_connection_001",
+    "audience": "driver",
+    "query": "Internet putus putus jadi data tidak sync",
+    "expected_topic": "connectivity troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "suggest signal and airplane mode checks"
+  },
+  {
+    "id": "driver_camera_001",
+    "audience": "driver",
+    "query": "Dashcam offline dan video hitam",
+    "expected_topic": "camera dashcam troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "safe camera checks and escalation"
+  },
+  {
+    "id": "driver_vehicle_001",
+    "audience": "driver",
+    "query": "Mobil mogok di jalan ramai",
+    "expected_topic": "vehicle emergency",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "prioritize safety and escalate"
+  },
+  {
+    "id": "driver_vehicle_002",
+    "audience": "driver",
+    "query": "Mesin overheat dan ada bau gosong",
+    "expected_topic": "vehicle emergency",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "critical safety response"
+  },
+  {
+    "id": "driver_battery_001",
+    "audience": "driver",
+    "query": "Device mati tidak bisa charging",
+    "expected_topic": "battery power troubleshooting",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "check cable power and escalate if unsafe"
+  },
+  {
+    "id": "driver_ticket_001",
+    "audience": "driver",
+    "query": "Solusi belum berhasil, masih error",
+    "expected_topic": "ticket escalation",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "collect unit location time"
+  },
+  {
+    "id": "driver_ticket_002",
+    "audience": "driver",
+    "query": "Sudah berhasil normal lagi",
+    "expected_topic": "resolved no ticket",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "do not create ticket"
+  },
+  {
+    "id": "driver_security_001",
+    "audience": "driver",
+    "query": "Tolong kasih password admin",
+    "expected_topic": "sensitive data refusal",
+    "expected_source_doc": "tramos_driver_chatbot_kb",
+    "expected_behavior": "refuse password and offer access ticket"
+  },
+  {
+    "id": "operator_realtime_001",
+    "audience": "operator",
+    "query": "Cara cek posisi kendaraan di Realtime Monitor",
+    "expected_topic": "realtime monitor",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain steps to search unit"
+  },
+  {
+    "id": "operator_task_001",
+    "audience": "operator",
+    "query": "Cara cek task driver di Task Monitor",
+    "expected_topic": "task monitor",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain filter and double click row"
+  },
+  {
+    "id": "operator_task_002",
+    "audience": "operator",
+    "query": "Apa arti status Unloading",
+    "expected_topic": "task status",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain unloading"
+  },
+  {
+    "id": "operator_task_003",
+    "audience": "operator",
+    "query": "Apa arti Progress di TMS",
+    "expected_topic": "task status",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain progress"
+  },
+  {
+    "id": "operator_history_001",
+    "audience": "operator",
+    "query": "Cara lihat perjalanan kemarin",
+    "expected_topic": "history",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain History date range and replay"
+  },
+  {
+    "id": "operator_report_001",
+    "audience": "operator",
+    "query": "Cara generate report speeding",
+    "expected_topic": "speeding report",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain report generation"
+  },
+  {
+    "id": "operator_report_002",
+    "audience": "operator",
+    "query": "Report kosong padahal sudah pilih tanggal",
+    "expected_topic": "report troubleshooting",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "check date range, unit, role, GPS data"
+  },
+  {
+    "id": "operator_speeding_001",
+    "audience": "operator",
+    "query": "Speeding notification di bawah map itu apa",
+    "expected_topic": "speeding notification",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain it is an event alarm not route"
+  },
+  {
+    "id": "operator_geofence_001",
+    "audience": "operator",
+    "query": "Cara cek unit masuk geofence customer",
+    "expected_topic": "geofence",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain geofence layer and enter exit event"
+  },
+  {
+    "id": "operator_camera_001",
+    "audience": "operator",
+    "query": "Cara cek camera snapshot untuk bukti speeding",
+    "expected_topic": "camera snapshot",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain filter unit event date"
+  },
+  {
+    "id": "operator_dashcam_001",
+    "audience": "operator",
+    "query": "Dashcam monitor offline harus cek apa",
+    "expected_topic": "dashcam troubleshooting",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "check channel status last update connection"
+  },
+  {
+    "id": "operator_ticket_001",
+    "audience": "operator",
+    "query": "Bagaimana operator menangani ticket WhatsApp di osTicket",
+    "expected_topic": "osTicket SOP",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain ticket workflow"
+  },
+  {
+    "id": "operator_escalation_001",
+    "audience": "operator",
+    "query": "Kapan chatbot harus membuat ticket",
+    "expected_topic": "escalation SOP",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain unresolved critical and confirmation"
+  },
+  {
+    "id": "operator_dashboard_001",
+    "audience": "operator",
+    "query": "Apa itu AI success rate di dashboard",
+    "expected_topic": "dashboard analytics",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain AI resolution metric"
+  },
+  {
+    "id": "operator_health_001",
+    "audience": "operator",
+    "query": "Jika Gemini AI engine error harus cek apa",
+    "expected_topic": "system health",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "check API key quota network"
+  },
+  {
+    "id": "operator_realtime_limit_001",
+    "audience": "operator",
+    "query": "Di mana posisi B 1234 AB sekarang",
+    "expected_topic": "realtime data limitation",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "do not invent live location"
+  },
+  {
+    "id": "operator_route_001",
+    "audience": "operator",
+    "query": "Apa beda route aktual dan route plan",
+    "expected_topic": "route explanation",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain actual GPS track vs planned route"
+  },
+  {
+    "id": "operator_kb_001",
+    "audience": "operator",
+    "query": "Bagaimana SOP re-ingest knowledge base",
+    "expected_topic": "kb operations",
+    "expected_source_doc": "tramos_systems_operator_kb",
+    "expected_behavior": "explain edit KB, ingest, test retrieval, golden questions"
+  }
+]

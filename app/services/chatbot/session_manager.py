@@ -69,6 +69,7 @@ class ConversationSession:
         self.conversation_history: list = []
         self.ticket_created = False
         self.ticket_id: Optional[str] = None
+        self.ticket_retry_count: int = 0  # Track retry attempts untuk escape hatch
         
         # Database tracking IDs (recovered via get_or_create on cache miss)
         self._db_conversation_id: Optional[int] = None
@@ -296,13 +297,16 @@ class SessionManager:
         return False
     
     def _restore_session_from_db(self, db_session) -> Optional[ConversationSession]:
-        """Reconstruct ConversationSession from database model"""
+        """Rekonstruksi ConversationSession dari database model"""
         try:
             session = ConversationSession(db_session.phone_number, db_session.session_id)
             session.current_state = DialogState(db_session.current_state)
             session.driver_name = db_session.driver_name
             session.problem_description = db_session.problem_description
             session.problem_category = db_session.problem_category
+            # FIX: problem_severity tidak pernah di-restore dari DB
+            # Menyebabkan session continuity bermasalah setelah server restart
+            session.problem_severity = db_session.problem_severity or "medium"
             session.vehicle_unit = db_session.vehicle_unit
             session.location = db_session.location
             session.issue_time = db_session.issue_time
@@ -311,7 +315,7 @@ class SessionManager:
             session.ticket_created = db_session.ticket_created
             session.ticket_id = db_session.ticket_id
             session.last_activity = db_session.last_activity or datetime.now()
-            
+
             return session
         except Exception as e:
             logger.error(f"Error restoring session from DB: {e}")

@@ -1,0 +1,17 @@
+name: tramos
+
+services:
+  dashboard:
+    build:
+      context: ..
+      dockerfile: deploy/dashboard-static.Dockerfile
+    image: tramos-dashboard:latest
+    container_name: tramos-dashboard
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${TRAMOS_DASHBOARD_HOST_PORT:-30080}:80"
+    volumes:
+      - "${TRAMOS_DASHBOARD_DIST_PATH:-/opt/tramos/dashboard/dist}:/usr/share/nginx/html:ro"
+    depends_on:
+      backend:
+        condition: service_healthy

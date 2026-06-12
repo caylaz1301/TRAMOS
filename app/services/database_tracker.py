@@ -834,8 +834,8 @@ class DatabaseTracker:
             try:
                 db.rollback()
                 db.close()
-            except:
-                pass
+            except Exception as cleanup_error:
+                logger.debug("Dashboard summary cleanup failed: %s", cleanup_error)
 
     # ========================================================================
     # CONVENIENCE: FULL TURN TRACKING

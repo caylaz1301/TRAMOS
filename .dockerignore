@@ -1,0 +1,23 @@
+.git
+.gitignore
+.env
+.env.*
+!deploy/env.production.example
+deploy/env.production
+deploy/.env
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+dist/
+*.log
+ngrok.yml
+Copy of Form4-Implementation.docx
+docs/*.docx
+private/
+secrets/

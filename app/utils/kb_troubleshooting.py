@@ -7,8 +7,8 @@ This KB now contains FULL troubleshooting content per category:
 - workaround: Temporary fix if main steps fail
 - escalation_triggers: When to escalate to human support
 
-The AI system uses these as fallback when Ollama/LLM is unavailable,
-and as context-enrichment when LLM IS available.
+Sistem AI memakai data ini sebagai fallback jika RAG/Gemini tidak tersedia,
+serta sebagai penguat konteks untuk jawaban troubleshooting.
 """
 
 from typing import Optional, List

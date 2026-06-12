@@ -1,0 +1,1030 @@
+TRAMOS SYSTEMS KNOWLEDGE BASE
+Versi dokumen: 2026-06-04
+Disusun untuk: Knowledge base AI chatbot TRAMOS / fleet monitoring assistant
+Catatan sumber: Dokumen ini disusun berdasarkan observasi UI TRAMOS Systems yang terlihat pada halaman Task Monitor, Realtime Monitor, History, Reports, Camera Snapshot, Dashcam Monitor, dan Control Panel. Ini bukan dokumen resmi vendor, tetapi ringkasan operasional yang dibuat untuk membantu chatbot menjawab pertanyaan pengguna.
+
+================================================================================
+1. RINGKASAN SINGKAT
+================================================================================
+
+TRAMOS Systems adalah sistem web untuk tracking, monitoring, dan safety kendaraan operasional. Sistem ini digunakan oleh dispatcher, supervisor, admin transport, dan tim operasional untuk memantau posisi kendaraan secara realtime, melihat status perjalanan, mengelola task pengiriman, membaca riwayat perjalanan, melihat bukti kamera, memantau dashcam, dan membuat laporan operasional.
+
+Fokus utama TRAMOS:
+- Realtime vehicle monitoring.
+- Task monitoring untuk pengiriman atau pekerjaan kendaraan.
+- Tracking route yang sudah dilalui dan route yang sudah ditentukan.
+- Status kendaraan seperti driving, parking, idle, unloading, waiting, progress, offline, atau delayed update.
+- Notifikasi event seperti speeding, geofence, GPS delayed, atau kamera/dashcam event.
+- Laporan perjalanan, stop, idle, speeding, working time, fuel, geofence, dan safety.
+
+Secara sederhana, TRAMOS adalah control tower untuk armada kendaraan. Pengguna dapat melihat kendaraan mana yang sedang bergerak, sedang parkir, sedang menjalankan task, sedang unloading, atau membutuhkan perhatian karena data GPS terlambat, melewati batas kecepatan, atau tidak memiliki data driver/RFID.
+
+================================================================================
+2. PENGGUNA UTAMA
+================================================================================
+
+1. Dispatcher
+   Dispatcher menggunakan TRAMOS untuk memantau kendaraan yang sedang menjalankan task, mencari unit tertentu, melihat posisi kendaraan di map, mengecek apakah kendaraan masih sesuai route, dan membuka riwayat perjalanan.
+
+2. Supervisor Operasional
+   Supervisor menggunakan TRAMOS untuk memantau ringkasan status kendaraan, mengecek exception, melihat notifikasi speeding atau GPS delayed, memvalidasi task, dan memastikan pengiriman berjalan sesuai jadwal.
+
+3. Admin Transport
+   Admin menggunakan TRAMOS untuk mengelola data kendaraan, driver, user, group, geofence, konfigurasi laporan, dan perangkat GPS.
+
+4. Tim Safety / Compliance
+   Tim safety menggunakan TRAMOS untuk melihat speeding, fatigue, harsh driving, reverse event, accident, dashcam event, dan bukti visual dari camera snapshot.
+
+5. Management
+   Management menggunakan laporan TRAMOS untuk melihat produktivitas armada, utilisasi, ketepatan waktu, kilometer perjalanan, idle time, downtime, dan potensi risiko operasional.
+
+================================================================================
+3. KONSEP DASAR TRAMOS
+================================================================================
+
+3.1 Vehicle / Unit
+Vehicle atau unit adalah kendaraan yang dipasang perangkat GPS. Setiap unit biasanya memiliki nomor polisi, driver, group, status, lokasi terakhir, speed, heading, dan informasi task.
+
+Contoh informasi unit:
+- Vehicle: B9068NU (ECFS)
+- Driver: NANA SUTRISNA
+- Group: CDDL BEKASI
+- State: Parking / Progress / Unloading
+- Speed: 0 km/h atau 49 km/h
+- Location: alamat atau koordinat terakhir
+- Task: PLI - DEPOK
+- Trip Ref: nomor referensi perjalanan
+
+3.2 Driver
+Driver adalah pengemudi kendaraan. Driver bisa terkait dengan vehicle, task, RFID, safety record, dan laporan working time. Jika driver tidak terbaca, sistem dapat menampilkan kondisi seperti No RFID Driver.
+
+3.3 Group
+Group adalah pengelompokan kendaraan atau area operasional. Contoh group:
+- CDDL BEKASI
+- CDE BEKASI
+- FULL BOX BEKASI
+- FULL BOX PALEMBANG
+
+Group membantu operator memfilter unit berdasarkan pool, cabang, area, jenis armada, atau tim operasional.
+
+3.4 Task
+Task adalah pekerjaan atau assignment kendaraan. Dalam konteks TRAMOS TMS, task sering berkaitan dengan pengiriman, unloading, pre-task, main task, origin, destination, schedule, dan trip reference.
+
+Contoh task:
+- PLI - DEPOK
+- TNF - BEKASI
+- CIK - KEDIRI
+- BKS - LAMPUNG
+- KLN - SURABAYA
+
+3.5 Trip
+Trip adalah perjalanan kendaraan dari origin ke destination. Trip dapat memiliki route yang sudah ditentukan, route yang sudah dilalui, distance, duration, average speed, dan estimated arrival.
+
+3.6 Route yang Ditentukan
+Route yang ditentukan adalah jalur rencana yang seharusnya diikuti oleh driver. Route ini biasanya tampil di map sebagai jalur plan atau target. Jalur ini membantu operator mengecek apakah kendaraan mengikuti jalur yang benar.
+
+3.7 Route yang Sudah Dilalui
+Route yang sudah dilalui adalah track aktual kendaraan berdasarkan data GPS. Route ini menunjukkan pergerakan driver dari awal perjalanan sampai posisi terakhir.
+
+3.8 Notification / Alarm
+Notification adalah pemberitahuan event tertentu. Contoh:
+- Speeding in public area.
+- GPS data delayed.
+- Geofence enter/exit.
+- Camera snapshot event.
+- Dashcam event.
+- Unit offline.
+
+Notification bukan route utama dan bukan data task utama. Notification hanya memberi tahu operator bahwa ada kondisi yang perlu dicek.
+
+================================================================================
+4. HALAMAN LOGIN
+================================================================================
+
+Alamat contoh:
+https://tramos.systems/iv/account/login?ref=
+
+Fungsi halaman login:
+- Masuk ke sistem TRAMOS dengan username dan password.
+- Setelah login, pengguna diarahkan ke halaman monitoring sesuai hak akses.
+- Jika session masih aktif, pengguna bisa langsung membuka halaman seperti dashboard, realtime monitor, atau TMS.
+
+Hal yang biasanya perlu dijawab chatbot:
+
+Pertanyaan: Saya tidak bisa login, harus bagaimana?
+Jawaban yang disarankan:
+Pastikan username dan password benar, koneksi internet stabil, dan akun masih aktif. Jika tetap gagal, hubungi admin sistem untuk reset password atau pengecekan hak akses.
+
+Pertanyaan: Kenapa saya diarahkan ke login lagi?
+Jawaban yang disarankan:
+Kemungkinan session sudah expired, browser tidak menyimpan cookie, atau akun login dari device lain. Silakan login ulang.
+
+================================================================================
+5. DASHBOARD / VEHICLE STATUS SUMMARY
+================================================================================
+
+Dashboard adalah halaman ringkasan status armada. Halaman ini berguna untuk melihat kondisi umum kendaraan tanpa harus membuka setiap unit satu per satu.
+
+Informasi yang umum tampil:
+- Total vehicle / total unit.
+- Driving / kendaraan yang sedang bergerak.
+- Idle / kendaraan mesin hidup tetapi tidak bergerak.
+- Stop / Parking / kendaraan berhenti atau parkir.
+- Offline / kendaraan tidak mengirim data.
+- Delayed update / data GPS terlambat.
+- No GPS data / tidak ada data GPS.
+- No RFID Driver / driver tidak terbaca RFID.
+- In private areas / unit berada di area privat.
+- In public areas / unit berada di area publik.
+
+Fungsi dashboard:
+- Melihat kondisi umum operasional.
+- Mengidentifikasi unit yang butuh perhatian.
+- Membuka monitoring realtime.
+- Membuka task monitor.
+- Membuka laporan.
+- Membuka history.
+
+Cara penggunaan:
+1. Buka dashboard.
+2. Periksa total unit dan status kendaraan.
+3. Cek jumlah unit bermasalah seperti offline, delayed update, no GPS data, atau speeding.
+4. Klik menu Realtime Monitor untuk melihat posisi kendaraan di map.
+5. Klik Task Monitor untuk melihat assignment kendaraan.
+6. Klik Report untuk membuka laporan detail.
+
+================================================================================
+6. TASK MONITOR / TMS
+================================================================================
+
+Alamat contoh:
+https://tramos.systems/tms
+
+Task Monitor atau TMS adalah halaman untuk memantau task kendaraan. Halaman ini menampilkan daftar kendaraan yang sedang menjalankan pekerjaan, status task, driver, group, waktu update, origin, destination, dan trip reference.
+
+Pada TRAMOS, Task Monitor memiliki dua mode utama:
+- Table view.
+- Map view.
+
+6.1 Header Task Monitor
+
+Header biasanya menampilkan:
+- Logo TRAMOS.
+- Judul: Task Monitor | Tempo Group.
+- Profile user di kanan.
+- Toolbar untuk action monitoring.
+
+Toolbar yang umum terlihat:
+- Table / Map toggle.
+- Order By.
+- Refresh.
+- History.
+- Manage.
+- Customize Column.
+- Zoom to All.
+- Ungroup Vehicles.
+
+6.2 Table View
+
+Table view menampilkan task dalam bentuk tabel operasional. Table ini cocok untuk dispatcher yang ingin scan banyak task sekaligus.
+
+Kolom yang terlihat:
+- No.
+- Icon status / marker.
+- Vehicle.
+- Driver.
+- Group.
+- Time.
+- Trip Type.
+- Status.
+- Task.
+- Task Ref.
+- Trip.
+- Origin.
+- Destination.
+
+Contoh row:
+- Vehicle: B9068NU (ECFS)
+- Driver: NANA SUTRISNA
+- Group: CDDL BEKASI
+- Time: Jun 01, 18:10:24
+- Trip Type: Main Task
+- Status: Unloading
+- Task: PLI - DEPOK
+- Task Ref: 5410295521
+- Trip: PLI - DEPOK
+- Origin: PLI DMG
+- Destination: PTT DPK
+
+Status task yang umum:
+- Progress: task sedang berjalan.
+- Unloading: kendaraan sedang unloading di lokasi tujuan.
+- Waiting: task menunggu mulai atau belum berjalan.
+- Assigned: task sudah ditugaskan tetapi belum berjalan.
+
+6.3 ON TASK Group
+
+Di table, terdapat section atau group seperti ON TASK. Ini berarti daftar unit yang sedang memiliki task aktif. Group ini memudahkan operator melihat kendaraan yang sedang berjalan dalam pekerjaan aktif.
+
+6.4 Filter
+
+Di bagian bawah table, terdapat filter untuk mencari data berdasarkan:
+- Vehicle.
+- Task Ref.
+- Task.
+- Origin.
+- Destination.
+- Driver.
+
+Cara pakai filter:
+1. Ketik nomor polisi, nama driver, nama task, origin, destination, atau task ref.
+2. Table akan menampilkan row yang sesuai.
+3. Operator dapat klik atau double-click row untuk melihat unit di map.
+
+6.5 Double-click Row
+
+Di TRAMOS terdapat instruksi:
+Double-click on the row to display the unit on the map.
+
+Artinya:
+- Jika pengguna double-click row di table, sistem akan membuka unit tersebut di map.
+- Map akan fokus ke posisi kendaraan dan detail task.
+
+6.6 Map View
+
+Map view menampilkan posisi kendaraan, route, dan panel detail task.
+
+Elemen map:
+- Peta utama.
+- Search find unit/driver.
+- Marker posisi kendaraan.
+- Route yang sudah dilalui oleh driver.
+- Route yang sudah ditentukan / planned route.
+- Origin marker.
+- Destination marker.
+- Zoom control.
+- Zoom to All.
+- Ungroup Vehicles.
+- Panel detail di kanan.
+- Camera preview di bawah.
+- Notification event seperti speeding.
+
+Penting:
+Speeding notification di bawah map adalah notifikasi event. Itu bukan route dan bukan task utama. Contohnya "Speeding in public area (42 Km/h)" berarti ada driver yang melewati batas kecepatan di area publik.
+
+6.7 Panel Detail di Map
+
+Panel kanan pada map biasanya menampilkan informasi unit terpilih:
+
+Bagian identitas:
+- Vehicle.
+- Driver.
+- State.
+- Speed.
+- Direction.
+- Location.
+
+Bagian Task:
+- Task.
+- Schedule.
+- Trip.
+- Type.
+- Origin.
+- Destination.
+- Distance.
+- Start at.
+
+Bagian Traveled:
+- Distance.
+- Duration.
+- Avg Speed.
+
+Bagian Estimated:
+- Distance left.
+- Time left.
+- Arrive at.
+
+Bagian Layer / Toggle:
+- Show Track.
+- Checkpoint.
+- Geofence.
+
+6.8 Arti Tombol Task Monitor
+
+Table / Map:
+Mengubah tampilan dari tabel ke peta atau sebaliknya.
+
+Order By:
+Mengurutkan data berdasarkan Vehicle, Driver, Task, Time, Origin, Destination, atau pilihan lain yang tersedia.
+
+Refresh:
+Memuat ulang data task, status kendaraan, dan update terbaru.
+
+History:
+Membuka halaman riwayat perjalanan atau histori task/unit.
+
+Manage:
+Biasanya digunakan untuk pengelolaan task, assignment, atau action operasional. Contoh action: assign driver, update schedule, close unloading, atau perubahan task.
+
+Customize Column:
+Mengatur kolom mana saja yang tampil di table.
+
+Zoom to All:
+Mengatur zoom map agar seluruh kendaraan atau route yang relevan terlihat.
+
+Ungroup Vehicles:
+Memisahkan kendaraan yang sebelumnya dikelompokkan di map. Berguna saat banyak kendaraan berada di area berdekatan.
+
+Show Track:
+Menampilkan track/rute yang dilalui kendaraan.
+
+Checkpoint:
+Menampilkan checkpoint atau titik pemeriksaan pada route.
+
+Geofence:
+Menampilkan area geofence di map.
+
+================================================================================
+7. REALTIME MONITOR
+================================================================================
+
+Realtime Monitor adalah halaman untuk memantau kendaraan secara realtime di map. Halaman ini biasanya fokus pada lokasi kendaraan, status, speed, driver, dan event terbaru.
+
+Mode tampilan:
+- Map view.
+- Table view.
+
+Fitur yang umum:
+- Map kendaraan realtime.
+- Search unit atau driver.
+- Filter status kendaraan.
+- Group by vehicle/driver/group.
+- Sort atau order by.
+- Reset filter.
+- Cluster kendaraan jika banyak unit berdekatan.
+- Marker kendaraan.
+- Popup detail kendaraan.
+- Panel detail unit.
+- Notification event.
+
+Informasi unit di Realtime Monitor:
+- Vehicle / nomor polisi.
+- Driver.
+- Status.
+- Speed.
+- Direction.
+- Engine status.
+- Last update.
+- Location.
+- Fuel.
+- GPS signal.
+- Task aktif jika ada.
+
+Status umum:
+- Driving: kendaraan bergerak.
+- Idle: kendaraan hidup tetapi tidak bergerak.
+- Parking / Stop: kendaraan berhenti.
+- Offline: kendaraan tidak mengirim data.
+- Delayed update: data terakhir sudah terlalu lama.
+
+Cara menggunakan Realtime Monitor:
+1. Buka menu Realtime Monitor.
+2. Cari unit atau driver di search.
+3. Pilih unit dari list atau marker map.
+4. Lihat popup/detail kendaraan.
+5. Gunakan filter untuk melihat hanya driving, idle, parking, atau offline.
+6. Aktifkan track jika ingin melihat rute yang dilalui.
+7. Cek notification jika ada event seperti speeding atau GPS delayed.
+
+================================================================================
+8. HISTORY
+================================================================================
+
+History adalah halaman untuk melihat riwayat perjalanan kendaraan. Fitur ini digunakan saat operator ingin melihat perjalanan sebelumnya, mengecek route aktual, atau investigasi kejadian.
+
+Fitur umum History:
+- Pilih Unit.
+- Pilih Driver atau Group.
+- Pilih date range.
+- Pilih mode Map atau Table.
+- Export CSV.
+- Replay perjalanan.
+- Timeline perjalanan.
+- Detail perjalanan.
+
+Tab atau kategori yang umum:
+- Timeline.
+- Detail.
+- Engine.
+- Driving.
+- Idle.
+- Stop.
+- Speeding.
+- Events.
+- Rash Driving / Harsh Driving.
+- Reverse.
+- Geofence.
+
+Cara menggunakan History:
+1. Buka menu History.
+2. Pilih unit atau driver.
+3. Tentukan tanggal mulai dan tanggal akhir.
+4. Klik search/load.
+5. Lihat timeline atau map replay.
+6. Gunakan tab detail untuk melihat durasi, speed, stop, idle, dan event.
+7. Export CSV jika perlu laporan.
+
+Pertanyaan umum:
+
+Apa beda Realtime Monitor dan History?
+Realtime Monitor menampilkan kondisi kendaraan saat ini. History menampilkan perjalanan masa lalu.
+
+Kapan pakai History?
+Gunakan History untuk investigasi route, speeding lama, stop lama, idle, geofence, atau bukti perjalanan.
+
+================================================================================
+9. REPORT
+================================================================================
+
+Report adalah modul laporan operasional. Modul ini membantu supervisor dan management melihat data dalam bentuk rekap.
+
+Jenis report yang umum:
+- Trip Summary.
+- Idle Report.
+- Stop Report.
+- Working Time.
+- Reverse Summary.
+- DIMS / Driver Improvement.
+- Monthly Summary.
+- Fatigue Summary.
+- Mileage Day.
+- Alarm Video.
+- Speeding.
+- Fuel Usage.
+- Geofence Events.
+
+9.1 Trip Summary
+Berisi ringkasan perjalanan seperti jarak, durasi, start/end, average speed, dan unit/driver terkait.
+
+9.2 Idle Report
+Berisi catatan kendaraan yang engine on tetapi tidak bergerak. Berguna untuk mengurangi pemborosan fuel dan meningkatkan produktivitas.
+
+9.3 Stop Report
+Berisi lokasi parkir/stop, durasi berhenti, dan unit terkait.
+
+9.4 Working Time
+Berisi jam kerja driver, waktu aktif di route, overtime signal, dan durasi tugas.
+
+9.5 Reverse Summary
+Berisi event kendaraan mundur, lokasi, dan potensi risiko.
+
+9.6 DIMS / Driver Improvement
+Berisi data perilaku driver seperti harsh braking, overspeed, fatigue, dan driving behavior.
+
+9.7 Monthly Summary
+Berisi trend bulanan, utilisasi armada, mileage, downtime, dan performance.
+
+9.8 Fatigue Summary
+Berisi indikasi kelelahan seperti perjalanan malam, duty panjang, atau alarm fatigue.
+
+9.9 Mileage Day
+Berisi kilometer harian per unit, ranking kendaraan, dan produktivitas route.
+
+9.10 Alarm Video
+Berisi bukti video dari dashcam ketika terjadi alarm.
+
+9.11 Speeding
+Berisi pelanggaran batas kecepatan, lokasi, speed, driver, dan unit.
+
+9.12 Fuel Usage
+Berisi trend fuel, low fuel event, dan kemungkinan fuel drop.
+
+9.13 Geofence Events
+Berisi catatan kendaraan masuk/keluar area seperti depot, warehouse, customer, port, atau pool.
+
+Cara menggunakan Report:
+1. Pilih jenis report.
+2. Pilih unit, driver, group, atau area jika tersedia.
+3. Pilih tanggal.
+4. Generate report.
+5. Review data.
+6. Export PDF/CSV/Excel jika tersedia.
+
+================================================================================
+10. CAMERA SNAPSHOT / PHOTOCAM
+================================================================================
+
+Camera Snapshot atau PhotoCam adalah modul bukti visual berupa foto dari kendaraan atau event.
+
+Fungsi:
+- Melihat snapshot saat kendaraan masuk geofence.
+- Melihat snapshot saat speeding.
+- Melihat bukti arrival.
+- Melihat bukti fuel stop.
+- Melihat bukti stop/parking.
+- Mendukung investigasi safety.
+
+Informasi snapshot:
+- Unit.
+- Driver.
+- Location.
+- Time.
+- Event.
+- Camera channel.
+- Thumbnail atau image.
+
+Cara menggunakan:
+1. Buka Camera Snapshot / PhotoCam.
+2. Cari unit, driver, atau lokasi.
+3. Filter berdasarkan event atau tanggal.
+4. Klik snapshot untuk review.
+5. Download jika perlu bukti.
+
+================================================================================
+11. DASHCAM MONITOR
+================================================================================
+
+Dashcam Monitor adalah modul untuk memantau kamera kendaraan secara video. Modul ini digunakan untuk safety, bukti pengiriman, dan investigasi event.
+
+Fitur umum:
+- Live video.
+- Channel camera seperti Front, Cabin, Rear.
+- Status camera: Live, Review, Offline.
+- Event camera.
+- Snapshot.
+- Fullscreen.
+- Audio/mic jika perangkat mendukung.
+- Evidence review.
+
+Informasi yang umum:
+- Unit.
+- Driver.
+- Channel.
+- Status.
+- Event.
+- Location.
+- Time.
+
+Cara menggunakan:
+1. Buka Dashcam Monitor.
+2. Pilih unit atau channel.
+3. Lihat live feed atau event review.
+4. Gunakan snapshot/download jika perlu bukti.
+5. Jika status offline, cek koneksi perangkat atau last update.
+
+================================================================================
+12. GEOFENCE
+================================================================================
+
+Geofence adalah area virtual di map. Area ini digunakan untuk mendeteksi kendaraan masuk atau keluar lokasi tertentu.
+
+Contoh geofence:
+- Warehouse.
+- Depot.
+- Customer area.
+- Port.
+- Pool.
+- Rest area.
+- Loading/unloading area.
+
+Fitur geofence:
+- Menampilkan area di map.
+- Membuat area baru.
+- Edit radius/shape.
+- Enter/exit notification.
+- Filter unit berdasarkan geofence.
+- Report geofence event.
+
+Use case:
+- Mengetahui kendaraan sampai di customer.
+- Mengetahui unloading mulai.
+- Mendeteksi kendaraan keluar jalur.
+- Memantau kendaraan di area publik/privat.
+- Membuat alarm jika kendaraan masuk area terlarang.
+
+================================================================================
+13. CONTROL PANEL
+================================================================================
+
+Control Panel adalah modul administrasi sistem.
+
+Area konfigurasi:
+- Vehicle master data.
+- Driver master data.
+- User & role.
+- Group.
+- GPS device pairing.
+- Telegram alert.
+- API webhook.
+- Database retention.
+- Backup.
+- Notification rule.
+
+Contoh modul:
+- Units.
+- Drivers.
+- Users & Roles.
+- Telegram Alerts.
+- API Webhook.
+- Database.
+
+Smart handling / rule yang mungkin dipakai:
+- Jika GPS delayed lebih dari 30 menit, tandai unit sebagai attention dan kirim notifikasi.
+- Jika speed melewati threshold, buat speeding report dan request dashcam/snapshot.
+- Jika vehicle masuk customer geofence, mulai unloading timer.
+- Jika telemetry API gagal, tampilkan last-known position dan degraded state.
+
+================================================================================
+14. ISTILAH PENTING
+================================================================================
+
+Vehicle:
+Kendaraan atau unit yang dipantau.
+
+Driver:
+Pengemudi kendaraan.
+
+Group:
+Kelompok unit berdasarkan cabang, area, pool, atau tipe operasi.
+
+Task:
+Pekerjaan atau assignment kendaraan.
+
+Trip:
+Perjalanan dari origin ke destination.
+
+Task Ref:
+Nomor referensi task/perjalanan.
+
+Origin:
+Lokasi awal perjalanan.
+
+Destination:
+Lokasi tujuan.
+
+Schedule:
+Jadwal task.
+
+State:
+Keadaan kendaraan/task saat ini.
+
+Progress:
+Task sedang berjalan.
+
+Unloading:
+Kendaraan sedang proses unloading di tujuan.
+
+Waiting:
+Task belum mulai atau menunggu proses berikutnya.
+
+Parking:
+Kendaraan berhenti/parkir.
+
+Driving:
+Kendaraan bergerak.
+
+Idle:
+Mesin hidup tetapi kendaraan tidak bergerak.
+
+Offline:
+Unit tidak mengirim data.
+
+Delayed update:
+Data GPS terlambat dari waktu normal.
+
+No GPS data:
+Tidak ada data GPS.
+
+No RFID Driver:
+Driver tidak terbaca melalui RFID.
+
+Geofence:
+Area virtual di map.
+
+Checkpoint:
+Titik pemeriksaan pada route.
+
+Show Track:
+Menampilkan track/rute yang sudah dilalui.
+
+Speeding:
+Kendaraan melewati batas kecepatan.
+
+Alarm:
+Event atau notifikasi penting.
+
+Camera Snapshot:
+Bukti foto dari kamera.
+
+Dashcam:
+Kamera video kendaraan.
+
+================================================================================
+15. PERBEDAAN MODUL YANG SERING MEMBINGUNGKAN
+================================================================================
+
+Task Monitor vs Realtime Monitor
+Task Monitor fokus pada pekerjaan/task kendaraan: task, origin, destination, schedule, progress, unloading, task ref. Realtime Monitor fokus pada posisi kendaraan saat ini, status GPS, speed, dan lokasi.
+
+Task Monitor Table vs Task Monitor Map
+Table menampilkan semua task dalam daftar. Map menampilkan task/unit terpilih di peta beserta route yang sudah dilalui dan route yang ditentukan.
+
+Realtime Monitor vs History
+Realtime Monitor menampilkan posisi sekarang. History menampilkan perjalanan masa lalu.
+
+Route yang sudah dilalui vs Route yang ditentukan
+Route yang sudah dilalui adalah track aktual dari GPS. Route yang ditentukan adalah jalur rencana yang seharusnya diikuti.
+
+Speeding notification vs Route
+Speeding notification adalah alarm event. Itu bukan jalur perjalanan. Notification hanya memberi tahu driver/unit melewati batas speed di lokasi tertentu.
+
+Camera Snapshot vs Dashcam Monitor
+Camera Snapshot adalah foto/event image. Dashcam Monitor adalah video/live feed/review event dari kamera kendaraan.
+
+Report vs History
+History dipakai untuk melihat perjalanan unit secara detail. Report dipakai untuk rekap dan analisis dalam format laporan.
+
+================================================================================
+16. ALUR KERJA OPERATOR
+================================================================================
+
+16.1 Cek Kondisi Armada Harian
+1. Buka Dashboard.
+2. Lihat total unit, driving, parking, idle, offline, delayed update.
+3. Cek exception seperti speeding, GPS delayed, atau no driver.
+4. Buka Realtime Monitor untuk melihat peta.
+5. Buka Task Monitor untuk cek task berjalan.
+
+16.2 Mencari Unit Tertentu
+1. Buka Realtime Monitor atau Task Monitor.
+2. Ketik nomor polisi atau nama driver di search.
+3. Klik unit.
+4. Lihat detail lokasi, speed, driver, dan task.
+
+16.3 Mengecek Task Pengiriman
+1. Buka Task Monitor.
+2. Pilih Table jika ingin melihat banyak task.
+3. Gunakan filter berdasarkan vehicle, task ref, origin, destination, atau driver.
+4. Double-click row untuk buka unit di map.
+5. Cek route yang sudah dilalui dan route yang ditentukan.
+6. Cek state: Progress, Waiting, atau Unloading.
+
+16.4 Mengecek Speeding
+1. Buka notification speeding di map atau report.
+2. Lihat unit, driver, speed, dan lokasi.
+3. Buka History untuk melihat route dan waktu kejadian.
+4. Buka Camera Snapshot atau Dashcam jika perlu bukti.
+5. Buat catatan atau follow-up ke supervisor.
+
+16.5 Mengecek GPS Delayed / Offline
+1. Buka Dashboard atau Realtime Monitor.
+2. Filter status offline/delayed.
+3. Klik unit.
+4. Cek last update.
+5. Hubungi driver atau cek perangkat GPS.
+6. Jika data belum normal, eskalasi ke admin/teknisi.
+
+16.6 Mengecek Arrival / Unloading
+1. Buka Task Monitor.
+2. Filter status Unloading.
+3. Pilih unit.
+4. Cek destination dan waktu arrival.
+5. Cek geofence customer.
+6. Jika ada snapshot, buka Camera Snapshot.
+
+16.7 Membuat Laporan
+1. Buka Report.
+2. Pilih jenis laporan.
+3. Pilih tanggal/unit/group.
+4. Generate report.
+5. Review hasil.
+6. Export jika perlu.
+
+================================================================================
+17. CONTOH JAWABAN CHATBOT
+================================================================================
+
+Pertanyaan: TRAMOS itu apa?
+Jawaban:
+TRAMOS adalah sistem tracking monitoring safety untuk armada kendaraan. Sistem ini membantu dispatcher dan supervisor memantau posisi kendaraan secara realtime, melihat task pengiriman, memeriksa route yang sudah dilalui, melihat route yang ditentukan, menerima notifikasi seperti speeding, membuka history perjalanan, dan membuat laporan operasional.
+
+Pertanyaan: Cara lihat posisi kendaraan?
+Jawaban:
+Buka menu Realtime Monitor, lalu cari nomor polisi atau nama driver di kolom search. Klik unit yang muncul di list atau marker map untuk melihat detail posisi, status, speed, driver, dan last update.
+
+Pertanyaan: Cara cek task driver?
+Jawaban:
+Buka Task Monitor. Di table, cari vehicle, driver, task ref, origin, atau destination. Klik row untuk memilih task, atau double-click row untuk membuka posisi unit di map. Di map, cek panel kanan untuk detail task, schedule, trip, origin, destination, distance, traveled, dan estimated.
+
+Pertanyaan: Apa arti Progress di Task Monitor?
+Jawaban:
+Progress berarti task sedang berjalan. Kendaraan sudah memulai perjalanan atau sedang menuju destination. Di map, biasanya terlihat route yang sudah dilalui dan sisa route yang masih harus ditempuh.
+
+Pertanyaan: Apa arti Unloading?
+Jawaban:
+Unloading berarti kendaraan sudah berada di destination atau area tujuan dan sedang proses bongkar muatan.
+
+Pertanyaan: Apa arti Waiting?
+Jawaban:
+Waiting berarti task belum mulai atau kendaraan sedang menunggu proses berikutnya.
+
+Pertanyaan: Bedanya route hijau dan route abu-abu apa?
+Jawaban:
+Route hijau menunjukkan rute yang sudah dilalui kendaraan berdasarkan GPS. Route abu-abu atau putus-putus menunjukkan rute yang sudah ditentukan atau planned route yang seharusnya diikuti driver.
+
+Pertanyaan: Speeding di bawah map itu apa?
+Jawaban:
+Itu adalah notifikasi event. Speeding berarti kendaraan melewati batas kecepatan di lokasi tertentu. Notifikasi tersebut bukan route utama, tetapi alarm agar operator mengecek driver/unit terkait.
+
+Pertanyaan: Cara lihat perjalanan kemarin?
+Jawaban:
+Buka menu History, pilih unit atau driver, pilih tanggal yang ingin dicek, lalu lihat timeline, map replay, detail trip, stop, idle, speeding, dan event lain.
+
+Pertanyaan: Cara lihat laporan speeding?
+Jawaban:
+Buka Report, pilih Speeding Report, tentukan tanggal dan unit/group jika diperlukan, lalu generate report. Laporan akan menampilkan unit, driver, speed, lokasi, dan waktu kejadian.
+
+Pertanyaan: Cara cek kamera?
+Jawaban:
+Untuk foto event, buka Camera Snapshot atau PhotoCam. Untuk video/live feed, buka Dashcam Monitor. Pilih unit atau event yang ingin dilihat.
+
+Pertanyaan: Kenapa unit tidak update?
+Jawaban:
+Kemungkinan perangkat GPS offline, sinyal lemah, kendaraan berada di area susah sinyal, power perangkat bermasalah, atau koneksi server terganggu. Cek last update di Realtime Monitor dan eskalasi ke admin/teknisi jika tetap delayed.
+
+================================================================================
+18. INTENT CHATBOT YANG DISARANKAN
+================================================================================
+
+Intent: explain_tramos
+Tujuan: Menjelaskan apa itu TRAMOS.
+
+Intent: explain_task_monitor
+Tujuan: Menjelaskan halaman Task Monitor/TMS.
+
+Intent: explain_realtime_monitor
+Tujuan: Menjelaskan Realtime Monitor.
+
+Intent: explain_history
+Tujuan: Menjelaskan History.
+
+Intent: explain_report
+Tujuan: Menjelaskan modul Report.
+
+Intent: explain_camera_snapshot
+Tujuan: Menjelaskan PhotoCam/Camera Snapshot.
+
+Intent: explain_dashcam
+Tujuan: Menjelaskan Dashcam Monitor.
+
+Intent: explain_geofence
+Tujuan: Menjelaskan geofence.
+
+Intent: find_vehicle
+Tujuan: Membantu user mencari kendaraan.
+
+Intent: check_task_status
+Tujuan: Menjelaskan status task seperti Progress, Waiting, Unloading.
+
+Intent: check_speeding
+Tujuan: Menjelaskan speeding notification atau speeding report.
+
+Intent: check_offline_unit
+Tujuan: Membantu user memahami unit offline/delayed.
+
+Intent: how_to_export_report
+Tujuan: Membantu user membuat/export laporan.
+
+Intent: route_explanation
+Tujuan: Menjelaskan perbedaan route actual dan planned route.
+
+================================================================================
+19. DATA YANG SEBAIKNYA DIHUBUNGKAN KE CHATBOT
+================================================================================
+
+Jika chatbot akan dibuat lebih pintar, sebaiknya integrasikan data berikut:
+
+Data vehicle:
+- plate_number.
+- driver_name.
+- group.
+- status.
+- speed.
+- latitude.
+- longitude.
+- last_update.
+- fuel_level.
+- engine_on.
+
+Data task:
+- task_id.
+- task_ref.
+- vehicle.
+- driver.
+- trip_type.
+- status.
+- task_name.
+- origin.
+- destination.
+- schedule_start.
+- schedule_end.
+- distance.
+- traveled_distance.
+- estimated_distance_left.
+- estimated_arrival.
+
+Data event:
+- event_id.
+- event_type.
+- vehicle.
+- driver.
+- location.
+- speed.
+- time.
+- severity.
+- evidence_url.
+
+Data report:
+- report_type.
+- period.
+- unit.
+- group.
+- summary.
+- export_url.
+
+Data camera:
+- unit.
+- channel.
+- event.
+- timestamp.
+- image/video URL.
+
+================================================================================
+20. BATASAN JAWABAN CHATBOT
+================================================================================
+
+Chatbot boleh menjelaskan:
+- Fungsi menu.
+- Cara penggunaan.
+- Arti status.
+- Langkah troubleshooting umum.
+- Cara membaca map, route, table, dan report.
+- Saran next step operasional.
+
+Chatbot harus berhati-hati:
+- Jangan mengarang lokasi realtime jika tidak punya akses data live.
+- Jangan menyatakan unit sedang di lokasi tertentu tanpa data aktual.
+- Jangan mengubah data task kecuali chatbot punya akses action resmi.
+- Jangan memberikan password atau data sensitif.
+- Jangan menjanjikan export jika fitur tidak tersedia di role user.
+- Jangan menyalahkan driver tanpa bukti event/data.
+
+Jika data tidak tersedia, jawaban yang disarankan:
+Saya belum menerima data realtime untuk unit tersebut. Silakan cek Realtime Monitor atau masukkan nomor polisi/task ref agar saya bisa bantu arahkan pengecekan.
+
+================================================================================
+21. RINGKASAN UNTUK PROMPT SYSTEM CHATBOT
+================================================================================
+
+Kamu adalah AI assistant untuk TRAMOS Systems, sistem tracking monitoring safety armada kendaraan. Tugasmu membantu dispatcher, supervisor, dan admin memahami penggunaan TRAMOS, membaca status unit, menjelaskan task, route, report, history, geofence, camera snapshot, dashcam, dan notification.
+
+Gunakan bahasa Indonesia yang jelas, singkat, dan operasional. Jika user bertanya tentang posisi atau status realtime, minta nomor polisi, nama driver, task ref, atau group. Jangan mengarang data live jika tidak tersedia. Jelaskan perbedaan route yang sudah dilalui dan route yang ditentukan. Jelaskan bahwa speeding notification adalah alarm event, bukan route. Berikan langkah-langkah praktis sesuai modul TRAMOS.
+
+================================================================================
+22. QUICK REFERENCE MENU
+================================================================================
+
+Dashboard:
+Ringkasan status armada.
+
+Realtime Monitor:
+Peta realtime kendaraan dan status live.
+
+Task Monitor / TMS:
+Monitoring task, route, origin, destination, progress, unloading, waiting.
+
+History:
+Riwayat perjalanan, replay, timeline, stop, idle, speeding.
+
+Report:
+Laporan trip, idle, stop, working time, speeding, fuel, geofence, fatigue.
+
+Camera Snapshot / PhotoCam:
+Bukti foto event.
+
+Dashcam Monitor:
+Live/review video kendaraan.
+
+Geofence:
+Area virtual dan event enter/exit.
+
+Control Panel:
+Administrasi unit, driver, user, alert, API, database.
+
+================================================================================
+23. PENUTUP
+================================================================================
+
+TRAMOS Systems berfungsi sebagai pusat monitoring kendaraan yang menggabungkan realtime tracking, task management, route monitoring, event notification, camera evidence, dashcam, history, dan reporting. Untuk chatbot, knowledge base ini dapat digunakan untuk menjawab pertanyaan umum pengguna, menjelaskan alur kerja operator, dan membantu troubleshooting dasar.
+
+Dokumen ini bisa dikembangkan lagi dengan data resmi perusahaan, screenshot tiap halaman, nama role, SOP internal, threshold speed, definisi geofence, daftar report yang benar-benar aktif, serta integrasi API realtime.

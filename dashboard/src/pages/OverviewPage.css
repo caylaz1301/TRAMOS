@@ -116,6 +116,35 @@
   color: var(--text-muted);
   font-weight: 400;
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kpi-trend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kpi-trend-dot.trend-good { background: var(--emerald); }
+.kpi-trend-dot.trend-warn { background: var(--amber); }
+.kpi-trend-dot.trend-bad  { background: var(--rose); }
+
+/* ── Trend Chart ── */
+.trend-chart-card {
+  margin-bottom: 20px;
+}
+
+.trend-chart-wrap {
+  padding: 16px 20px 10px;
+  height: 260px;
+}
+
+.card-badge-info {
+  background: var(--accent-muted);
+  color: var(--accent);
 }
 
 /* ── Charts ── */

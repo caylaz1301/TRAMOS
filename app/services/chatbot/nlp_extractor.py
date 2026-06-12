@@ -1,23 +1,22 @@
-"""
-NLP Extractor - Extracts structured information from problem descriptions
-Uses Mistral LLM for semantic understanding of problem details
+"""Extractor deterministik untuk kategori dan urgensi masalah driver.
+
+Modul ini sengaja tidak memanggil service AI eksternal agar dialog flow tetap
+cepat dan stabil saat WhatsApp/Gemini sedang tidak dipakai untuk test terminal.
 """
 
 import json
 import logging
 import re
 from typing import Dict, Any, Optional
-import requests
 
 logger = logging.getLogger(__name__)
 
 
 class ProblemExtractor:
-    """Extract structured problem details from free-text descriptions using NLP"""
+    """Extract structured problem details from free-text descriptions."""
     
-    def __init__(self, ollama_url: str = "http://localhost:11434"):
-        self.ollama_url = ollama_url
-        self.model = "mistral"
+    def __init__(self):
+        self.model = "keyword-rules"
     
     def extract_problem_details(self, problem_description: str) -> Dict[str, Any]:
         """
@@ -34,31 +33,7 @@ class ProblemExtractor:
         """
         
         try:
-            # Create extraction prompt
-            prompt = self._build_extraction_prompt(problem_description)
-            
-            # Call Mistral with extraction prompt
-            response = requests.post(
-                f"{self.ollama_url}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0.3,  # Lower temp for consistent extraction
-                },
-                timeout=10
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Ollama extraction failed: {response.text}")
-                return self._get_default_extraction()
-            
-            # Parse response
-            response_text = response.json().get("response", "").strip()
-            extracted = self._parse_extraction_response(response_text, problem_description)
-            
-            return extracted
-        
+            return self._extract_by_keywords(problem_description)
         except Exception as e:
             logger.error(f"Error extracting problem details: {e}")
             return self._get_default_extraction()

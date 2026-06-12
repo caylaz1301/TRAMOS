@@ -667,6 +667,130 @@ class SolutionEffectiveness(Base):
         return f"<SolutionEffectiveness id={self.solution_id} success_rate={self.success_rate:.1%}>"
 
 
+class KBDocument(Base):
+    """Knowledge base source document metadata for RAG."""
+    __tablename__ = "kb_documents"
+    __table_args__ = (
+        Index('idx_kb_documents_doc_id', 'doc_id'),
+        Index('idx_kb_documents_audience', 'audience'),
+        Index('idx_kb_documents_category', 'category'),
+        Index('idx_kb_documents_active', 'is_active'),
+        UniqueConstraint('doc_id', name='uq_kb_document_doc_id'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    doc_id = Column(String(120), nullable=False)
+    title = Column(String(500), nullable=False)
+    source_path = Column(Text, nullable=False)
+    source_hash = Column(String(64), nullable=False)
+    audience = Column(String(80), default="general", nullable=False)
+    category = Column(String(120), default="general", nullable=False)
+    tags = Column(JSON, default=[])
+    version = Column(String(40))
+    source = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    chunk_count = Column(Integer, default=0)
+    meta_data = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    chunks = relationship("KBChunk", back_populates="document", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<KBDocument doc_id={self.doc_id} chunks={self.chunk_count}>"
+
+
+class KBChunk(Base):
+    """Searchable chunk generated from a KB document."""
+    __tablename__ = "kb_chunks"
+    __table_args__ = (
+        Index('idx_kb_chunks_document', 'document_id'),
+        Index('idx_kb_chunks_audience', 'audience'),
+        Index('idx_kb_chunks_category', 'category'),
+        Index('idx_kb_chunks_active', 'is_active'),
+        Index('idx_kb_chunks_doc_order', 'document_id', 'chunk_index'),
+        UniqueConstraint('document_id', 'chunk_index', name='uq_kb_chunk_document_index'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_id = Column(Integer, ForeignKey('kb_documents.id', ondelete='CASCADE'), nullable=False)
+    chunk_index = Column(Integer, nullable=False)
+    heading_path = Column(Text)
+    content = Column(Text, nullable=False)
+    content_hash = Column(String(64), nullable=False)
+    audience = Column(String(80), default="general", nullable=False)
+    category = Column(String(120), default="general", nullable=False)
+    tags = Column(JSON, default=[])
+    embedding_model = Column(String(120))
+    embedding_dimensions = Column(Integer, default=0)
+    embedding_json = Column(JSON)
+    token_estimate = Column(Integer, default=0)
+    start_char_pos = Column(Integer)
+    end_char_pos = Column(Integer)
+    is_active = Column(Boolean, default=True, nullable=False)
+    meta_data = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    document = relationship("KBDocument", back_populates="chunks")
+
+    def __repr__(self):
+        return f"<KBChunk doc={self.document_id} idx={self.chunk_index}>"
+
+
+class KBIngestionRun(Base):
+    """Audit table for KB ingestion/reindex jobs."""
+    __tablename__ = "kb_ingestion_runs"
+    __table_args__ = (
+        Index('idx_kb_ingestion_status', 'status'),
+        Index('idx_kb_ingestion_started', 'started_at'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    source_dir = Column(Text, nullable=False)
+    status = Column(String(40), default="running", nullable=False)
+    files_found = Column(Integer, default=0)
+    documents_processed = Column(Integer, default=0)
+    chunks_created = Column(Integer, default=0)
+    chunks_embedded = Column(Integer, default=0)
+    skipped_unchanged = Column(Integer, default=0)
+    errors = Column(JSON, default=[])
+    meta_data = Column(JSON, default={})
+    started_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime)
+
+    def __repr__(self):
+        return f"<KBIngestionRun id={self.id} status={self.status}>"
+
+
+class KBRetrievalLog(Base):
+    """Log every RAG lookup for observability and quality audits."""
+    __tablename__ = "kb_retrieval_logs"
+    __table_args__ = (
+        Index('idx_kb_retrieval_created', 'created_at'),
+        Index('idx_kb_retrieval_audience', 'audience'),
+        Index('idx_kb_retrieval_query_hash', 'query_hash'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    query = Column(Text, nullable=False)
+    query_hash = Column(String(64), nullable=False)
+    audience = Column(String(80))
+    category = Column(String(120))
+    top_k = Column(Integer, default=5)
+    min_score = Column(Float, default=0.0)
+    result_count = Column(Integer, default=0)
+    top_score = Column(Float, default=0.0)
+    used_pgvector = Column(Boolean, default=False)
+    latency_ms = Column(Integer, default=0)
+    selected_chunk_ids = Column(JSON, default=[])
+    meta_data = Column(JSON, default={})
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<KBRetrievalLog query_hash={self.query_hash} results={self.result_count}>"
+
+
 
 # ============================================================================
 # DATABASE INITIALIZATION & MANAGEMENT

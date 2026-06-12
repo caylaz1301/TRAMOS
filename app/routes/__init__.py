@@ -1,4 +1,4 @@
 """Routes package"""
-from . import tickets, whatsapp
+from . import analytics, auth, kb, tickets, whatsapp
 
-__all__ = ["tickets", "whatsapp"]
+__all__ = ["analytics", "auth", "kb", "tickets", "whatsapp"]

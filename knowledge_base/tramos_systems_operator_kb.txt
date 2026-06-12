@@ -1,0 +1,570 @@
+doc_id: tramos_systems_operator_kb
+title: TRAMOS Systems Operator Knowledge Base
+audience: operator, dispatcher, supervisor, analyst, admin
+category: operations
+tags: tramos, dashboard, operator, dispatcher, realtime monitor, task monitor, history, report, geofence, camera, dashcam, osTicket, SOP, escalation
+version: 2026-06-04
+last_updated: 2026-06-04
+source: tramos_knowledge_base.txt, Form4 implementation proposal, observed TRAMOS dashboard workflow
+
+# TRAMOS SYSTEMS OPERATOR KNOWLEDGE BASE
+
+Dokumen ini adalah knowledge base untuk AI TRAMOS ketika menjawab pertanyaan operator, dispatcher, supervisor, management analyst, dan support operator. Dokumen ini juga menjadi sumber RAG untuk menjelaskan fitur dashboard TRAMOS, SOP monitoring armada, SOP eskalasi, penggunaan osTicket, dan batasan jawaban chatbot.
+
+## 1. Ringkasan Sistem
+
+TRAMOS Systems adalah sistem monitoring operasional armada yang digunakan untuk memantau kendaraan, driver, task pengiriman, route, geofence, event safety, dashcam, camera snapshot, history perjalanan, dan report operasional.
+
+TRAMOS AI Support System adalah layer support tambahan yang menerima laporan masalah melalui WhatsApp, menganalisis masalah dengan AI, memberikan solusi awal, dan membuat ticket otomatis ke osTicket jika masalah tidak selesai.
+
+Tujuan utama sistem:
+- Mempercepat pelaporan masalah operasional.
+- Mengurangi pencatatan manual ke support.
+- Menyediakan troubleshooting awal untuk driver dan staff lapangan.
+- Menjaga semua issue yang tidak selesai agar masuk ke ticketing system.
+- Memberikan analytics untuk management melalui dashboard.
+
+## 2. Role Pengguna
+
+Driver atau field staff:
+- Melapor lewat WhatsApp.
+- Menjelaskan kendala di jalan atau kendala aplikasi.
+- Menerima solusi dari AI.
+- Memberikan konfirmasi apakah masalah selesai.
+- Memberikan data unit, lokasi, dan waktu jika perlu dibuat ticket.
+
+Dispatcher:
+- Memantau posisi unit realtime.
+- Memeriksa task berjalan.
+- Mengecek driver, group, route, status, dan event.
+- Menghubungi driver jika ada exception.
+
+Supervisor:
+- Mengecek kondisi armada secara menyeluruh.
+- Meninjau speeding, GPS delayed, offline unit, task terlambat, dan geofence.
+- Menentukan apakah issue perlu eskalasi.
+
+Support operator:
+- Memantau ticket di osTicket.
+- Membaca detail masalah dari chatbot.
+- Mengubah status ticket.
+- Memberi update dan menutup ticket setelah selesai.
+
+Management analyst:
+- Melihat dashboard analytics.
+- Menganalisis kategori issue, ticket volume, AI resolution rate, urgency, dan session quality.
+- Menggunakan data untuk evaluasi operasional.
+
+Admin:
+- Mengelola user, role, group, unit, driver, GPS device, API, webhook, dan integrasi.
+
+## 3. Prinsip Jawaban AI Untuk Operator
+
+AI harus:
+- Menjawab dengan bahasa Indonesia yang jelas, ringkas, dan operasional.
+- Memberikan langkah yang bisa dilakukan user.
+- Menjelaskan fitur TRAMOS berdasarkan knowledge base.
+- Meminta nomor polisi, driver, task ref, atau group jika user menanyakan data spesifik.
+- Mengarahkan operator ke menu yang tepat.
+- Menghindari klaim data realtime jika tidak memiliki akses data live.
+- Menjelaskan batasan jika data tidak tersedia.
+
+AI tidak boleh:
+- Mengarang posisi kendaraan.
+- Mengarang status unit.
+- Mengubah task, driver, geofence, atau data master tanpa akses action resmi.
+- Memberikan password, API key, token, atau data sensitif.
+- Menyalahkan driver tanpa bukti event.
+- Menjanjikan export/report jika role user tidak memiliki akses.
+
+Jawaban aman jika data realtime tidak tersedia:
+"Saya belum menerima data realtime untuk unit tersebut. Silakan masukkan nomor polisi, nama driver, task ref, atau group. Jika data live belum terhubung ke chatbot, cek melalui Realtime Monitor atau Task Monitor di dashboard TRAMOS."
+
+## 4. Dashboard Overview
+
+Dashboard Overview adalah halaman ringkasan operasional TRAMOS AI Support System.
+
+Metrik utama:
+- Total Conversations: jumlah sesi WhatsApp yang tercatat.
+- AI Success Rate: persentase masalah yang selesai tanpa ticket.
+- Escalated Tickets: jumlah sesi yang menjadi ticket osTicket.
+- Total Messages: total pesan dalam seluruh sesi.
+- Issue Category Distribution: distribusi kategori masalah.
+- Urgency Distribution: tingkat urgensi issue.
+- Recent Sessions: daftar percakapan terbaru.
+
+Cara membaca dashboard:
+1. Lihat total conversation untuk mengetahui volume laporan.
+2. Lihat AI success rate untuk menilai efektivitas chatbot.
+3. Lihat escalated tickets untuk mengetahui beban support.
+4. Lihat kategori masalah untuk mengetahui issue yang paling sering muncul.
+5. Lihat recent sessions untuk audit contoh percakapan terbaru.
+
+SOP jika AI success rate rendah:
+1. Buka AI Performance page.
+2. Cek kategori yang paling sering gagal.
+3. Tambahkan SOP atau solusi baru ke knowledge base.
+4. Re-ingest knowledge base.
+5. Jalankan dialog flow test.
+6. Pantau kembali metrik selama periode berikutnya.
+
+## 5. AI Performance Page
+
+AI Performance Page digunakan untuk mengevaluasi performa chatbot.
+
+Metrik penting:
+- Resolution outcome: resolved by AI, escalated, abandoned.
+- Completion rate.
+- Escalation rate.
+- Average messages per session.
+- Severity distribution.
+- Recommendation dari sistem analytics.
+
+Interpretasi:
+- AI resolution tinggi berarti chatbot cukup efektif.
+- Escalation tinggi berarti knowledge base kurang lengkap atau masalah memang banyak yang butuh operator.
+- Average messages terlalu tinggi bisa menandakan flow terlalu panjang atau pertanyaan bot kurang jelas.
+- Abandoned tinggi bisa berarti user bingung, respons bot terlalu panjang, atau proses tidak nyaman.
+
+SOP evaluasi AI:
+1. Identifikasi top escalated categories.
+2. Baca beberapa recent sessions.
+3. Catat pola user yang membuat bot gagal.
+4. Perbaiki KB dan dialog flow.
+5. Uji dengan terminal test.
+6. Monitor perubahan angka AI success rate.
+
+## 6. Reports and Notifications Page
+
+Halaman Reports and Notifications digunakan untuk memantau health sistem dan insight mingguan.
+
+Komponen:
+- Database status.
+- Gemini AI engine status.
+- WhatsApp API status.
+- osTicket status.
+- Weekly volume trend.
+- AI effectiveness.
+- Top escalated categories.
+- Peak hours.
+- System activity log.
+
+SOP jika ada status service bermasalah:
+1. Database error: cek PostgreSQL service, DATABASE_URL, dan koneksi.
+2. Gemini error: cek GEMINI_API_KEY, quota, dan network.
+3. WhatsApp API error: cek token Meta, phone ID, webhook URL, dan subscribed field messages.
+4. osTicket error: cek base URL, API key, endpoint, dan akses IP.
+5. Jika error berulang, buat ticket internal untuk admin teknis.
+
+## 7. Task Monitor / TMS
+
+Task Monitor atau TMS adalah halaman untuk memantau pekerjaan kendaraan.
+
+Fokus Task Monitor:
+- Task berjalan.
+- Status task.
+- Driver.
+- Group.
+- Trip type.
+- Origin.
+- Destination.
+- Schedule.
+- Task ref.
+- Route aktual dan route plan.
+
+Status umum:
+- Progress: task sedang berjalan.
+- Unloading: unit berada di tujuan dan sedang bongkar muatan.
+- Waiting: task menunggu proses berikutnya.
+- Assigned: task sudah ditugaskan tetapi belum berjalan.
+- Done/Completed: task selesai.
+
+Table view digunakan untuk scan banyak task sekaligus.
+Map view digunakan untuk melihat posisi unit, route, dan detail task.
+
+SOP mencari task:
+1. Buka Task Monitor.
+2. Gunakan filter Vehicle, Driver, Task Ref, Origin, atau Destination.
+3. Double-click row untuk menampilkan unit di map.
+4. Baca panel kanan untuk detail task.
+5. Cek status: Progress, Waiting, atau Unloading.
+6. Jika task tidak sesuai, hubungi dispatcher/supervisor.
+
+Arti tombol:
+- Table/Map: mengganti tampilan.
+- Order By: mengurutkan data.
+- Refresh: memuat data terbaru.
+- History: membuka riwayat.
+- Manage: action task jika user punya akses.
+- Customize Column: mengatur kolom tabel.
+- Zoom to All: melihat semua marker.
+- Ungroup Vehicles: memisahkan marker yang bertumpuk.
+- Show Track: menampilkan track aktual.
+- Checkpoint: menampilkan titik checkpoint.
+- Geofence: menampilkan area virtual.
+
+## 8. Realtime Monitor
+
+Realtime Monitor digunakan untuk melihat posisi unit saat ini.
+
+Data umum:
+- Vehicle/nomor polisi.
+- Driver.
+- Status unit.
+- Speed.
+- Direction.
+- Engine status.
+- Last update.
+- Location.
+- Fuel.
+- GPS signal.
+- Task aktif jika ada.
+
+Status unit:
+- Driving: kendaraan bergerak.
+- Idle: engine hidup tetapi kendaraan tidak bergerak.
+- Parking/Stop: kendaraan berhenti.
+- Offline: unit tidak mengirim data.
+- Delayed update: data terakhir sudah terlalu lama.
+- No GPS data: tidak ada data GPS.
+- No RFID Driver: driver tidak terbaca RFID.
+
+SOP cek posisi unit:
+1. Buka Realtime Monitor.
+2. Cari nomor polisi atau nama driver.
+3. Klik unit atau marker.
+4. Cek last update, lokasi, speed, dan status.
+5. Jika delayed/offline, cek SOP GPS delayed.
+
+SOP GPS delayed/offline:
+1. Cek last update.
+2. Cek apakah semua unit bermasalah atau hanya satu unit.
+3. Jika hanya satu unit, hubungi driver untuk cek power GPS, sinyal, dan posisi.
+4. Jika banyak unit bermasalah, cek network/server.
+5. Buka History untuk melihat data terakhir.
+6. Buat ticket teknis jika delayed tidak normal.
+
+## 9. History
+
+History digunakan untuk melihat perjalanan masa lalu.
+
+Fitur:
+- Pilih unit/driver/group.
+- Date range.
+- Map replay.
+- Timeline.
+- Detail trip.
+- Driving, idle, stop.
+- Speeding events.
+- Geofence events.
+- Export CSV jika tersedia.
+
+SOP investigasi perjalanan:
+1. Buka History.
+2. Pilih unit atau driver.
+3. Pilih tanggal kejadian.
+4. Load data.
+5. Cek timeline dan map replay.
+6. Cek stop, idle, speed, dan geofence.
+7. Export jika diperlukan untuk laporan.
+
+Kapan menggunakan History:
+- Investigasi speeding lama.
+- Memastikan route aktual.
+- Mengecek stop lama.
+- Mengecek idle berlebih.
+- Membuktikan arrival/departure.
+- Audit geofence enter/exit.
+
+## 10. Report
+
+Report digunakan untuk rekap operasional.
+
+Jenis report umum:
+- Trip Summary.
+- Idle Report.
+- Stop Report.
+- Working Time.
+- Reverse Summary.
+- DIMS / Driver Improvement.
+- Monthly Summary.
+- Fatigue Summary.
+- Mileage Day.
+- Alarm Video.
+- Speeding.
+- Fuel Usage.
+- Geofence Events.
+
+SOP generate report:
+1. Buka menu Report.
+2. Pilih report type.
+3. Pilih unit, driver, group, atau area.
+4. Pilih periode tanggal.
+5. Klik Generate.
+6. Review data.
+7. Export PDF/CSV/Excel jika tersedia.
+
+Jika report kosong:
+1. Pastikan date range benar.
+2. Pastikan unit/group dipilih benar.
+3. Pastikan role punya akses.
+4. Cek apakah data GPS tersedia pada periode tersebut.
+5. Coba report lain seperti History untuk validasi.
+
+## 11. Speeding SOP
+
+Speeding adalah event ketika unit melewati batas kecepatan.
+
+Speeding notification di map adalah alarm event, bukan route.
+
+SOP cek speeding:
+1. Buka notification atau Speeding Report.
+2. Catat unit, driver, speed, lokasi, dan waktu.
+3. Buka History pada waktu kejadian.
+4. Cek route dan speed sebelum/sesudah event.
+5. Buka Camera Snapshot atau Dashcam jika diperlukan.
+6. Laporkan ke supervisor jika event valid.
+
+AI tidak boleh menyatakan driver bersalah tanpa bukti lengkap. AI hanya boleh mengatakan event perlu dicek berdasarkan data.
+
+## 12. Geofence
+
+Geofence adalah area virtual di peta.
+
+Contoh geofence:
+- Warehouse.
+- Depot.
+- Customer area.
+- Port.
+- Pool.
+- Rest area.
+- Loading area.
+- Unloading area.
+
+Use case:
+- Mengetahui unit sampai customer.
+- Mengetahui unit keluar pool.
+- Mendeteksi keluar jalur.
+- Mencatat unloading start/end.
+- Mendeteksi masuk area terlarang.
+
+SOP cek geofence:
+1. Buka Realtime Monitor atau History.
+2. Aktifkan layer Geofence.
+3. Pilih unit.
+4. Cek enter/exit event.
+5. Bandingkan dengan task origin/destination.
+6. Gunakan report geofence jika perlu rekap.
+
+## 13. Camera Snapshot / PhotoCam
+
+Camera Snapshot adalah bukti foto event.
+
+Fungsi:
+- Bukti arrival.
+- Bukti speeding.
+- Bukti geofence event.
+- Bukti stop/parking.
+- Bukti investigasi safety.
+
+SOP cek snapshot:
+1. Buka Camera Snapshot atau PhotoCam.
+2. Filter unit, driver, event, atau tanggal.
+3. Klik thumbnail.
+4. Review foto, waktu, lokasi, dan camera channel.
+5. Download jika diperlukan sebagai bukti.
+
+Jika snapshot tidak muncul:
+1. Cek apakah unit punya perangkat kamera.
+2. Cek status camera online/offline.
+3. Cek koneksi perangkat.
+4. Cek storage/perizinan kamera.
+5. Eskalasi teknis jika kamera tidak terdeteksi.
+
+## 14. Dashcam Monitor
+
+Dashcam Monitor digunakan untuk live video atau review video event.
+
+Channel umum:
+- Front.
+- Cabin.
+- Rear.
+
+Status:
+- Live: kamera online.
+- Review: event/video dapat dibuka.
+- Offline: kamera tidak mengirim data.
+
+SOP cek dashcam:
+1. Buka Dashcam Monitor.
+2. Pilih unit atau channel.
+3. Cek live feed atau event review.
+4. Gunakan fullscreen jika perlu.
+5. Ambil snapshot/download jika fitur tersedia.
+6. Jika offline, cek last update dan koneksi perangkat.
+
+## 15. osTicket Integration
+
+osTicket adalah sistem ticketing untuk issue yang tidak selesai oleh chatbot.
+
+Ticket dibuat otomatis jika:
+- User mengatakan solusi tidak berhasil.
+- Masalah tidak punya solusi di knowledge base.
+- Masalah termasuk critical dan perlu operator.
+- Data eskalasi sudah lengkap dan user mengonfirmasi.
+
+Data ticket minimal:
+- Nama pelapor.
+- Nomor WhatsApp.
+- Kategori masalah.
+- Deskripsi masalah.
+- Unit/kendaraan.
+- Lokasi.
+- Waktu kejadian.
+- Priority.
+- Ringkasan percakapan.
+
+SOP support operator:
+1. Buka osTicket dashboard.
+2. Login sebagai operator.
+3. Cek ticket baru dari source WhatsApp.
+4. Baca subject, kategori, prioritas, dan detail.
+5. Cek ringkasan AI conversation.
+6. Hubungi driver/dispatcher jika perlu klarifikasi.
+7. Update status ticket: open, in progress, pending, resolved, closed.
+8. Tambahkan catatan penyelesaian.
+
+Priority guideline:
+- Critical: kendaraan mogok, emergency, keselamatan, unit tidak bisa jalan, semua service down.
+- High: issue menghambat operasi tetapi masih ada workaround.
+- Medium: issue normal yang perlu support.
+- Low: pertanyaan umum atau issue minor.
+
+## 16. SOP Eskalasi
+
+Eskalasi ke ticket diperlukan jika:
+- AI tidak punya solusi.
+- Solusi AI gagal.
+- User menjawab "tidak", "belum", "masih error", atau "gagal".
+- Issue critical.
+- Issue membutuhkan akses admin/hardware/operator.
+- Data sensitif atau perubahan konfigurasi dibutuhkan.
+
+Tidak perlu membuat ticket jika:
+- User menjawab berhasil.
+- User menyatakan masalah sudah normal.
+- User hanya bertanya cara menggunakan menu.
+- User hanya meminta penjelasan istilah.
+- User memberikan acknowledgement tanpa menyatakan gagal.
+
+SOP sebelum membuat ticket:
+1. Pastikan problem description sudah ada.
+2. Minta unit/kendaraan.
+3. Minta lokasi.
+4. Minta waktu kejadian.
+5. Tampilkan ringkasan.
+6. Minta konfirmasi.
+7. Buat ticket setelah user setuju.
+
+## 17. Batasan Data Realtime
+
+Jika AI belum terhubung ke API live TRAMOS Systems, AI harus mengatakan bahwa data live belum tersedia.
+
+Contoh jawaban:
+"Saya bisa bantu arahkan cara ceknya, tetapi saya belum punya akses data realtime untuk menyebut lokasi unit sekarang. Silakan buka Realtime Monitor dan cari nomor polisi tersebut, atau kirim nomor polisi agar saya bantu susun langkah pengecekannya."
+
+AI tidak boleh:
+- "Unit B1234AB sedang di Jakarta" tanpa data live.
+- "Driver pasti speeding" tanpa bukti report.
+- "Task sudah selesai" tanpa status live.
+
+## 18. Pertanyaan Umum Operator
+
+Pertanyaan: Cara cek posisi kendaraan?
+Jawaban: Buka Realtime Monitor, cari nomor polisi atau nama driver, klik unit atau marker, lalu cek detail lokasi, speed, status, dan last update.
+
+Pertanyaan: Cara cek task driver?
+Jawaban: Buka Task Monitor, cari vehicle/driver/task ref/origin/destination, double-click row untuk membuka unit di map, lalu baca panel kanan untuk detail task.
+
+Pertanyaan: Apa beda Realtime Monitor dan History?
+Jawaban: Realtime Monitor menampilkan kondisi sekarang, sedangkan History menampilkan perjalanan masa lalu.
+
+Pertanyaan: Apa beda route aktual dan route plan?
+Jawaban: Route aktual adalah track GPS yang sudah dilalui. Route plan adalah jalur yang seharusnya diikuti.
+
+Pertanyaan: Speeding notification itu apa?
+Jawaban: Speeding notification adalah alarm event saat kendaraan melewati batas kecepatan. Itu bukan route.
+
+Pertanyaan: Kenapa unit tidak update?
+Jawaban: Kemungkinan perangkat GPS offline, sinyal lemah, power bermasalah, SIM/network bermasalah, atau server belum menerima data. Cek last update dan lakukan SOP GPS delayed.
+
+## 19. Data Yang Sebaiknya Dikaitkan Dengan Chatbot
+
+Vehicle data:
+- plate_number.
+- driver_name.
+- group.
+- status.
+- speed.
+- latitude.
+- longitude.
+- last_update.
+- fuel_level.
+- engine_on.
+
+Task data:
+- task_id.
+- task_ref.
+- vehicle.
+- driver.
+- trip_type.
+- status.
+- origin.
+- destination.
+- schedule_start.
+- schedule_end.
+- traveled_distance.
+- estimated_arrival.
+
+Event data:
+- event_type.
+- vehicle.
+- driver.
+- location.
+- speed.
+- timestamp.
+- severity.
+- evidence_url.
+
+Ticket data:
+- osticket_id.
+- category.
+- priority.
+- status.
+- created_at.
+- updated_at.
+- assigned_operator.
+
+## 20. Prompt Constraint Untuk RAG
+
+Saat menjawab dengan knowledge base:
+- Gunakan konteks KB yang diberikan.
+- Jika konteks tidak cukup, katakan tidak cukup data.
+- Beri langkah praktis maksimal 5 poin untuk WhatsApp.
+- Untuk dashboard/operator, boleh lebih detail jika user meminta.
+- Selalu bedakan instruksi umum dan data realtime.
+- Jangan mengarang.
+
+## 21. SOP Re-ingest Knowledge Base
+
+Saat ada perubahan SOP:
+1. Edit file di folder `knowledge_base`.
+2. Jalankan script ingestion.
+3. Pastikan jumlah chunk masuk.
+4. Jalankan test retrieval.
+5. Jalankan golden questions.
+6. Restart backend jika service memakai cache.
+
+## 22. Penutup
+
+Knowledge base ini menjadi rujukan utama untuk operator dan dashboard TRAMOS. Untuk pertanyaan driver lapangan, gunakan juga dokumen `tramos_driver_chatbot_kb.txt` karena bahasanya lebih cocok untuk percakapan WhatsApp.

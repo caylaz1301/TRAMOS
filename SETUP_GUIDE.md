@@ -79,7 +79,7 @@ nano .env
 
 ```env
 # Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tramos_db
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/tramos_db
 
 # osTicket
 OSTICKET_BASE_URL=http://your-osticket-domain.com
@@ -93,9 +93,44 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=tramos_webhook_token_change_me
 # Webhook
 WEBHOOK_VERIFY_TOKEN=tramos_webhook_token_change_me
 
-# LLM (default: ollama)
-LLM_PROVIDER=ollama
+# LLM / RAG
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your-gemini-api-key-here
+KB_RAG_ENABLED=true
 ```
+
+### Step 2b: Setup Knowledge Base RAG
+
+TRAMOS AI sekarang mendukung production-ready knowledge base dengan PostgreSQL RAG.
+Knowledge base disimpan di folder `knowledge_base/`, lalu di-ingest ke tabel
+`kb_documents` dan `kb_chunks`.
+
+Pastikan `.env` memiliki konfigurasi berikut:
+
+```env
+GEMINI_API_KEY=your-gemini-api-key-here
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_EMBEDDING_DIMENSIONS=1536
+KB_RAG_ENABLED=true
+KB_SOURCE_DIR=knowledge_base
+KB_TOP_K=5
+KB_MIN_SCORE=0.35
+KB_PGVECTOR_REQUIRED=false
+```
+
+Jalankan migration dan ingestion:
+
+```bash
+cd /Users/vdr/Documents/TRAMOS
+source venv/bin/activate
+python scripts/database_migration_kb_rag.py
+python scripts/ingest_knowledge_base.py --source knowledge_base --reindex
+python scripts/test_kb_retrieval.py
+```
+
+Jika PostgreSQL lokal belum memiliki pgvector, sistem tetap berjalan memakai
+fallback cosine similarity dari `embedding_json`. Untuk production penuh,
+install/enable pgvector di PostgreSQL agar kolom `embedding_vector` aktif.
 
 ---
 
@@ -136,10 +171,10 @@ LLM_PROVIDER=ollama
 
 ```bash
 # Test subscribe
-curl "http://localhost:9999/webhook/whatsapp?hub_mode=subscribe&hub_challenge=TEST&hub_verify_token=tramos_webhook_token_change_me"
+curl "http://localhost:9999/webhook/whatsapp?hub.mode=subscribe&hub.challenge=TEST&hub.verify_token=tramos_webhook_token_change_me"
 
 # Atau via ngrok
-curl "https://ngrok-url-anda.ngrok-free.app/webhook/whatsapp?hub_mode=subscribe&hub_challenge=TEST&hub_verify_token=tramos_webhook_token_change_me"
+curl "https://ngrok-url-anda.ngrok-free.app/webhook/whatsapp?hub.mode=subscribe&hub.challenge=TEST&hub.verify_token=tramos_webhook_token_change_me"
 ```
 
 ---
@@ -148,13 +183,13 @@ curl "https://ngrok-url-anda.ngrok-free.app/webhook/whatsapp?hub_mode=subscribe&
 
 ```bash
 # Check Backend Health
-curl http://localhost:9999/tickets/health
+curl http://localhost:9999/health
 
 # Expected output:
-# {"status":"ok"}
+# {"status":"healthy", ...}
 
-# Check Ollama (if using)
-curl http://localhost:11434/api/tags
+# Check Knowledge Base RAG
+curl http://localhost:9999/api/kb/health
 
 # Check Database
 python query_db.py
@@ -217,16 +252,16 @@ ngrok stop
 ngrok start --config ngrok.yml
 ```
 
-### ❌ Ollama error (jika menggunakan AI)
+### ❌ Gemini atau RAG error (jika menggunakan AI/KB)
 ```bash
-# Cek Ollama running
-curl http://localhost:11434/api/tags
+# Cek health backend
+curl http://localhost:9999/health
 
-# Jika error, install Ollama
-# brew install ollama
+# Cek status knowledge base
+curl http://localhost:9999/api/kb/health
 
-# Pull model (first time, butuh waktu)
-ollama pull mistral
+# Re-ingest knowledge base dari folder knowledge_base
+python scripts/ingest_knowledge_base.py --source knowledge_base --reindex
 ```
 
 ---
@@ -240,7 +275,7 @@ APP_NAME=TRAMOS AI Support System
 APP_VERSION=1.0.0
 
 # ===== DATABASE =====
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/tramos_db
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/tramos_db
 
 # ===== OSTICKET =====
 OSTICKET_BASE_URL=http://localhost:81  # atau ngrok URL
@@ -258,11 +293,21 @@ WHATSAPP_WEBHOOK_VERIFY_TOKEN=tramos_webhook_token_change_me
 WEBHOOK_VERIFY_TOKEN=tramos_webhook_token_change_me
 
 # ===== AI/LLM =====
-LLM_PROVIDER=ollama  # atau gemini
-GEMINI_API_KEY=<if-using-gemini>
-GEMINI_PROJECT_ID=<if-using-gemini>
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=<your-gemini-api-key>
+GEMINI_PROJECT_ID=<optional>
+GEMINI_MODEL=gemini-2.0-flash
+GEMINI_EMBEDDING_MODEL=gemini-embedding-001
+GEMINI_EMBEDDING_DIMENSIONS=1536
 USE_LLM=true
 AI_CONFIDENCE_THRESHOLD=0.7
+
+# ===== KNOWLEDGE BASE / RAG =====
+KB_RAG_ENABLED=true
+KB_SOURCE_DIR=knowledge_base
+KB_TOP_K=5
+KB_MIN_SCORE=0.35
+KB_PGVECTOR_REQUIRED=false
 
 # ===== EMAIL (optional) =====
 SMTP_SERVER=smtp.gmail.com

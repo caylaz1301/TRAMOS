@@ -17,7 +17,6 @@ from app.services.osticket_service import osticket_service
 from app.services.chatbot.whatsapp_service import whatsapp_service
 from app.services.chatbot import session_manager as sm_module
 from app.services.chatbot.session_manager import DialogState
-from app.services.chatbot.dialog_flow_handler import DialogFlowHandler
 from app.services.chatbot.smart_dialog_flow import SmartDialogFlowHandler
 from app.services.chatbot.nlp_extractor import problem_extractor
 from app.utils.smart_response_system import smart_response_system
@@ -266,6 +265,17 @@ async def handle_incoming_message(request: Request) -> Response:
 # ============================================================================
 # AI-POWERED MESSAGE PROCESSING
 # ============================================================================
+# Alur ini menangani semua pesan masuk dari WhatsApp dengan state machine
+# yang tersusun dalam 13 state:
+# GREETING → COLLECTING_NAME → COLLECTING_PROBLEM → ASKING_SOLUTION_WORKED →
+# COLLECTING_UNIT → COLLECTING_LOCATION → COLLECTING_TIME → CONFIRMING_DETAILS →
+# CREATING_TICKET → (RESOLVED atau CLOSED)
+#
+# Setiap state memiliki handler spesifik yang melakukan:
+# 1. Validasi input user
+# 2. Ekstraksi data terstruktur
+# 3. Transisi ke state berikutnya
+# 4. Logging untuk analytics
 
 async def process_message_with_ai(
     message_body: str, 
@@ -308,15 +318,16 @@ async def process_message_with_ai(
     if session.current_state == DialogState.GREETING:
         # First message - greet and ask for name
         session.add_message(sender="user", message=message_body, intent="greeting", category=None)
-        response, next_state = DialogFlowHandler._handle_greeting(session)
-        session.current_state = next_state
+        # Langsung gunakan formatter global agar tidak men-shadow import module.
+        response = smart_response_system.format_for_whatsapp(smart_response_system.greeting())
+        session.current_state = DialogState.COLLECTING_NAME
         session.add_message(sender="bot", message=response, intent="greeting", category=None)
         get_session_manager().save_session(session)
         # DB tracking
         if session._db_conversation_id:
             _ms = int((_time.time() - _turn_start) * 1000)
             db_tracker.track_full_turn(phone_number, message_body, response,
-                session._db_conversation_id, session.message_count, next_state.value,
+                session._db_conversation_id, session.message_count, DialogState.COLLECTING_NAME.value,
                 intent="greeting", processing_time_ms=_ms)
         return response
     
@@ -341,6 +352,30 @@ async def process_message_with_ai(
     elif session.current_state == DialogState.COLLECTING_PROBLEM:
         # Collect problem description + extract category
         problem_text = message_body.strip()
+        if SmartDialogFlowHandler.is_blame_without_evidence_request(problem_text):
+            session.add_message(sender="user", message=message_body, intent="policy_guardrail", category="Driver")
+            response = SmartDialogFlowHandler.blame_without_evidence_response()
+            session.add_message(sender="bot", message=response, intent="policy_guardrail", category="Driver")
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, session.current_state.value,
+                    intent="policy_guardrail", category="Driver", processing_time_ms=_ms)
+            return response
+
+        if SmartDialogFlowHandler.is_sensitive_or_out_of_scope(problem_text):
+            session.add_message(sender="user", message=message_body, intent="out_of_scope", category=None)
+            response = SmartDialogFlowHandler.sensitive_request_response()
+            session.add_message(sender="bot", message=response, intent="out_of_scope", category=None)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, session.current_state.value,
+                    intent="out_of_scope", processing_time_ms=_ms)
+            return response
+
         ack_only = problem_text.lower() in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS
         if len(problem_text) < 5 or ack_only:
             session.add_message(sender="user", message=message_body, intent="clarification", category=None)
@@ -381,7 +416,8 @@ async def process_message_with_ai(
         logger.debug(f"📊 Problem extraction: Category={session.problem_category}, Severity={session.problem_severity}")
         
         # Search for KB solution and get feedback directly
-        response, next_state = DialogFlowHandler._search_kb_solution(session)
+        # Gunakan SmartDialogFlowHandler._search_kb_smart untuk pencarian solusi
+        response, next_state = SmartDialogFlowHandler._search_kb_smart(session)
         session.current_state = next_state
         session.add_message(sender="bot", message=response, intent="solution_search", category=session.problem_category)
         get_session_manager().save_session(session)
@@ -512,7 +548,7 @@ async def process_message_with_ai(
             logger.info(f"Re-extracted problem: {session.problem_category} from user detail: {message_body[:50]}")
             
             # Go back and search KB with updated problem
-            response, next_state = DialogFlowHandler._search_kb_solution(session)
+            response, next_state = SmartDialogFlowHandler._search_kb_smart(session)
             session.current_state = next_state
             session.add_message(sender="bot", message=response, intent="solution_search", category=session.problem_category)
             get_session_manager().save_session(session)
@@ -586,8 +622,9 @@ async def process_message_with_ai(
         session_manager.close_session(phone_number)
         session = session_manager.create_session(phone_number)
         session.add_message(sender="user", message=message_body, intent="greeting", category=None)
-        response, next_state = DialogFlowHandler._handle_greeting(session)
-        session.current_state = next_state
+        # Langsung gunakan formatter global saat sesi lama ditutup dan sesi baru dimulai.
+        response = smart_response_system.format_for_whatsapp(smart_response_system.greeting())
+        session.current_state = DialogState.COLLECTING_NAME
         session.add_message(sender="bot", message=response, intent="greeting", category=None)
         get_session_manager().save_session(session)
         
@@ -598,7 +635,7 @@ async def process_message_with_ai(
             if session._db_conversation_id:
                 _ms = int((_time.time() - _turn_start) * 1000)
                 db_tracker.track_full_turn(phone_number, message_body, response,
-                    session._db_conversation_id, session.message_count, next_state.value,
+                    session._db_conversation_id, session.message_count, DialogState.COLLECTING_NAME.value,
                     intent="greeting", processing_time_ms=_ms)
         return response
     
@@ -764,24 +801,73 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
             logger.info(f"✅ Ticket #{result.ticket_id} created from session {session.session_id}")
             return response
         else:
-            # Ticket creation failed
-            session.add_message(sender="bot", message="Error creating ticket", intent="error", category=None)
-            
+            # Ticket creation failed - increment retry counter
+            session.ticket_retry_count = getattr(session, 'ticket_retry_count', 0) + 1
+            session.current_state = DialogState.CONFIRMING_DETAILS
+
+            # Escape hatch: jika sudah 2x gagal, jangan terus retry
+            if session.ticket_retry_count >= 2:
+                escape_message = (
+                    f"⚠️ Sistem pencatatan laporan sedang mengalami gangguan.\n\n"
+                    f"Data laporan Anda sudah tersimpan di sistem kami:\n"
+                    f"• Nama: {session.driver_name or 'N/A'}\n"
+                    f"• Masalah: {session.problem_description[:100] if session.problem_description else 'N/A'}...\n"
+                    f"• Unit: {session.vehicle_unit or 'N/A'}\n"
+                    f"• Lokasi: {session.location or 'N/A'}\n\n"
+                    f"Tim TRAMOS akan tetap menghubungi Anda berdasarkan data yang sudah dikumpulkan.\n"
+                    f"Atau hubungi langsung: *admin@tramos.id* atau *0812-xxxx-xxxx*\n\n"
+                    f"Terima kasih atas kesabarannya. 🙏"
+                )
+                session.current_state = DialogState.CLOSED
+                session.add_message(sender="bot", message=escape_message, intent="escape_hatch", category=None)
+                get_session_manager().save_session(session)
+                logger.warning(f"Escape hatch triggered for {phone_number} after {session.ticket_retry_count} failed retries")
+                return escape_message
+
+            # First failure: give retry option
+            user_facing_error = (
+                f"❌ Maaf {session.driver_name or 'Bapak/Ibu'}, laporan belum bisa dibuat menjadi tiket saat ini.\n\n"
+                f"Data laporan Anda tetap tersimpan di percakapan ini. Tim TRAMOS tetap bisa menindaklanjuti "
+                f"berdasarkan detail yang sudah Anda kirim.\n\n"
+                f"Silakan kirim *ya* untuk mencoba lagi, atau hubungi support TRAMOS jika kondisi di lapangan urgent."
+            )
+            session.add_message(sender="bot", message=user_facing_error, intent="error", category=None)
+
             # Save failed attempt to database
             get_session_manager().save_session(session)
-            
-            logger.error(f"Failed to create ticket: {result.error}")
-            return (
-                f"❌ Maaf {session.driver_name}, gagal membuat tiket.\n\n"
-                f"Silakan coba lagi atau hubungi support langsung.\n"
-                f"Error: {result.error}"
-            )
+
+            logger.error(f"Failed to create ticket (attempt {session.ticket_retry_count}): {result.error}")
+            return user_facing_error
     
     except Exception as e:
         logger.error(f"Error in ticket creation: {e}", exc_info=True)
-        session.add_message(sender="bot", message="Error during ticket creation", intent="error", category=None)
-        get_session_manager().save_session(session)
-        return (
-            f"❌ Terjadi kesalahan saat membuat tiket.\n\n"
-            f"Silakan coba lagi atau hubungi support."
+        session.ticket_retry_count = getattr(session, 'ticket_retry_count', 0) + 1
+        session.current_state = DialogState.CONFIRMING_DETAILS
+
+        # Escape hatch: jika sudah 2x gagal, jangan terus retry
+        if session.ticket_retry_count >= 2:
+            escape_message = (
+                f"⚠️ Sistem pencatatan laporan sedang mengalami gangguan.\n\n"
+                f"Data laporan Anda sudah tersimpan di sistem kami:\n"
+                f"• Nama: {session.driver_name or 'N/A'}\n"
+                f"• Masalah: {session.problem_description[:100] if session.problem_description else 'N/A'}...\n"
+                f"• Unit: {session.vehicle_unit or 'N/A'}\n"
+                f"• Lokasi: {session.location or 'N/A'}\n\n"
+                f"Tim TRAMOS akan tetap menghubungi Anda berdasarkan data yang sudah dikumpulkan.\n"
+                f"Atau hubungi langsung: *admin@tramos.id* atau *0812-xxxx-xxxx*\n\n"
+                f"Terima kasih atas kesabarannya. 🙏"
+            )
+            session.current_state = DialogState.CLOSED
+            session.add_message(sender="bot", message=escape_message, intent="escape_hatch", category=None)
+            get_session_manager().save_session(session)
+            logger.warning(f"Escape hatch triggered (exception) for {phone_number} after {session.ticket_retry_count} failed attempts")
+            return escape_message
+
+        user_facing_error = (
+            f"❌ Maaf, laporan belum bisa dibuat menjadi tiket saat ini.\n\n"
+            f"Data laporan Anda tetap tersimpan di percakapan ini. Silakan kirim *ya* untuk mencoba lagi, "
+            f"atau hubungi support TRAMOS jika kondisi di lapangan urgent."
         )
+        session.add_message(sender="bot", message=user_facing_error, intent="error", category=None)
+        get_session_manager().save_session(session)
+        return user_facing_error
