@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Use relative URL so Vite proxy handles routing to backend
-const API_URL = '/api';
+// Production memakai prefix khusus agar API dashboard tidak bentrok dengan API osTicket.
+const API_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance with default config
 const api = axios.create({
@@ -36,7 +36,7 @@ api.interceptors.response.use(
       localStorage.removeItem('user_email');
       localStorage.removeItem('user_role');
       // Redirect to login instead of page reload
-      window.location.href = '/';
+      window.location.href = import.meta.env.BASE_URL;
     }
     return Promise.reject(error);
   }

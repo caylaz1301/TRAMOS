@@ -458,7 +458,7 @@ export default function Login({ onLoginSuccess }) {
 
         {/* ── Sliding Image Door ── */}
         <div className="image-section">
-          <img src="/loginpage.jpg" alt="TRAMOS Logistics" className="luxury-bg-img" />
+          <img src={`${import.meta.env.BASE_URL}loginpage.jpg`} alt="TRAMOS Logistics" className="luxury-bg-img" />
           <div className="image-overlay-gradient"></div>
         </div>
 
