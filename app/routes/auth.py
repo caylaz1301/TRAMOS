@@ -126,6 +126,21 @@ def extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return token.strip()
 
 
+def send_verification_email_or_fail(email: str, otp: str, name: str) -> None:
+    """Kirim OTP dan hentikan respons sukses jika layanan email gagal."""
+    if send_otp_email(email, otp, name):
+        return
+
+    logger.error("OTP delivery failed for %s", email)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "Kode verifikasi belum dapat dikirim. "
+            "Silakan coba Kirim Ulang beberapa saat lagi."
+        ),
+    )
+
+
 # ============================================================================
 # REGISTER
 # ============================================================================
@@ -151,7 +166,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
             existing.phone = request.phone.strip()
         db.commit()
 
-        send_otp_email(email, otp, request.full_name.strip())
+        send_verification_email_or_fail(email, otp, request.full_name.strip())
 
         return {"message": "Kode OTP telah dikirim ulang ke email kamu.", "email": email}
 
@@ -171,10 +186,7 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     db.commit()
 
     # Send OTP email
-    email_sent = send_otp_email(email, otp, request.full_name.strip())
-
-    if not email_sent:
-        logger.warning(f"OTP email failed for {email}, but account created")
+    send_verification_email_or_fail(email, otp, request.full_name.strip())
 
     logger.info(f"New user registered: {email}")
     return {"message": "Akun berhasil dibuat! Cek email untuk kode verifikasi.", "email": email}
@@ -234,7 +246,7 @@ async def resend_otp(request: ResendOTPRequest, db: Session = Depends(get_db)):
     user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
     db.commit()
 
-    send_otp_email(email, otp, user.full_name)
+    send_verification_email_or_fail(email, otp, user.full_name)
 
     return {"message": "Kode OTP baru telah dikirim ke email kamu."}
 
@@ -348,7 +360,7 @@ async def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db
                 user.otp_code = otp
                 user.otp_expires_at = datetime.utcnow() + timedelta(minutes=10)
                 db.commit()
-                send_otp_email(email, otp, name)
+                send_verification_email_or_fail(email, otp, name)
                 return {
                     "needs_verification": True,
                     "message": "Kode OTP telah dikirim ke email kamu untuk verifikasi.",
@@ -370,7 +382,7 @@ async def google_login(request: GoogleLoginRequest, db: Session = Depends(get_db
             db.add(new_user)
             db.commit()
 
-            send_otp_email(email, otp, name)
+            send_verification_email_or_fail(email, otp, name)
             logger.info(f"New Google sign-up (pending OTP): {email}")
 
             return {

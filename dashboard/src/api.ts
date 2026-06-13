@@ -25,11 +25,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Auto-logout on 401 responses - redirect to login
+// Hanya sesi yang sudah memiliki token yang boleh dipaksa logout saat 401.
+// Respons 401 dari form login harus diteruskan agar UI dapat menampilkan
+// pesan seperti "akun belum terdaftar", bukan me-refresh halaman.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = error.config?.url || '';
+    const isAuthenticationAttempt = ['/auth/login', '/auth/google'].some((path) =>
+      requestUrl.includes(path)
+    );
+    const hasAccessToken = Boolean(localStorage.getItem('access_token'));
+
+    if (error.response?.status === 401 && hasAccessToken && !isAuthenticationAttempt) {
       // Clear all auth data
       localStorage.removeItem('access_token');
       localStorage.removeItem('user_name');

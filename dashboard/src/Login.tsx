@@ -69,7 +69,18 @@ export default function Login({ onLoginSuccess }) {
       onLoginSuccess(result.access_token);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Google login gagal. Coba lagi.');
+      const httpStatus = err.response?.status;
+      if (
+        httpStatus === 401 &&
+        typeof detail === 'string' &&
+        (detail.toLowerCase().includes('belum terdaftar') ||
+          detail.toLowerCase().includes('tidak ditemukan'))
+      ) {
+        setAccountPrompt(true);
+        setError('Akun Google ini belum terdaftar. Buat akun terlebih dahulu untuk masuk.');
+      } else {
+        setError(typeof detail === 'string' ? detail : 'Google login gagal. Coba lagi.');
+      }
     } finally {
       setLoading(false);
     }
@@ -187,10 +198,15 @@ export default function Login({ onLoginSuccess }) {
     }
     setError(''); setLoading(true);
     try {
-      await authService.register(fullName.trim(), email.trim().toLowerCase(), password, phone.trim());
+      const result = await authService.register(
+        fullName.trim(),
+        email.trim().toLowerCase(),
+        password,
+        phone.trim()
+      );
       setPendingEmail(email.trim().toLowerCase());
       setSignUpStep('otp');
-      setSuccess('Kode verifikasi telah dikirim ke email kamu!');
+      setSuccess(result.message || 'Kode verifikasi telah dikirim ke email kamu!');
       setError('');
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -254,10 +270,11 @@ export default function Login({ onLoginSuccess }) {
   const handleResendOtp = async () => {
     setError(''); setLoading(true);
     try {
-      await authService.resendOtp(pendingEmail);
-      setSuccess('Kode OTP baru telah dikirim!');
+      const result = await authService.resendOtp(pendingEmail);
+      setSuccess(result.message || 'Kode OTP baru telah dikirim!');
     } catch (err) {
-      setError('Gagal mengirim ulang OTP.');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Gagal mengirim ulang kode verifikasi.');
     } finally { setLoading(false); }
   };
 
