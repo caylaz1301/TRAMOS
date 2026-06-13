@@ -28,6 +28,18 @@ export default function Login({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [accountPrompt, setAccountPrompt] = useState(false);
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+
+  useEffect(() => {
+    if (!showTerms) return undefined;
+
+    const closeWithEscape = (event) => {
+      if (event.key === 'Escape') setShowTerms(false);
+    };
+    document.addEventListener('keydown', closeWithEscape);
+    return () => document.removeEventListener('keydown', closeWithEscape);
+  }, [showTerms]);
 
   // ── Reset state on mode toggle ──
   const toggleMode = (toSignUp) => {
@@ -119,6 +131,10 @@ export default function Login({ onLoginSuccess }) {
   }, [handleGoogleCallback]);
 
   const handleGoogleLogin = () => {
+    if (isSignUp && !acceptedTerms) {
+      setError('Setujui Syarat dan Ketentuan terlebih dahulu untuk membuat akun.');
+      return;
+    }
     if (!GOOGLE_CLIENT_ID) {
       setError('Google login belum dikonfigurasi.');
       return;
@@ -188,6 +204,10 @@ export default function Login({ onLoginSuccess }) {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    if (!acceptedTerms) {
+      setError('Setujui Syarat dan Ketentuan terlebih dahulu untuk membuat akun.');
+      return;
+    }
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setError('Mohon lengkapi nama, email, dan password');
       return;
@@ -365,7 +385,9 @@ export default function Login({ onLoginSuccess }) {
                 <span className="footer-link">
                   Don't have an account? <b onClick={() => toggleMode(true)}>Sign up</b>
                 </span>
-                <span className="terms-link">Terms & Conditions</span>
+                <button type="button" className="terms-link" onClick={() => setShowTerms(true)}>
+                  Terms & Conditions
+                </button>
               </div>
             </form>
           </div>
@@ -407,9 +429,25 @@ export default function Login({ onLoginSuccess }) {
                     </div>
                   </div>
 
+                  <label className="terms-consent">
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={(event) => setAcceptedTerms(event.target.checked)}
+                      disabled={loading}
+                    />
+                    <span>
+                      Saya menyetujui{' '}
+                      <button type="button" onClick={() => setShowTerms(true)}>
+                        Syarat dan Ketentuan
+                      </button>
+                      .
+                    </span>
+                  </label>
+
                   {error && isSignUp && <div className="error-toast">{error}</div>}
 
-                  <button type="submit" disabled={loading} className="btn-pill-primary">
+                  <button type="submit" disabled={loading || !acceptedTerms} className="btn-pill-primary">
                     {loading ? 'Memproses...' : 'Create Account'}
                   </button>
 
@@ -417,7 +455,9 @@ export default function Login({ onLoginSuccess }) {
                     <span className="footer-link">
                       Have an account? <b onClick={() => toggleMode(false)}>Sign in</b>
                     </span>
-                    <span className="terms-link">Terms & Conditions</span>
+                    <button type="button" className="terms-link" onClick={() => setShowTerms(true)}>
+                      Terms & Conditions
+                    </button>
                   </div>
                 </form>
               </>
@@ -490,6 +530,131 @@ export default function Login({ onLoginSuccess }) {
 
       </div>
       <div id="google-btn-hidden" style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}></div>
+
+      {showTerms && (
+        <div className="terms-modal-backdrop" onMouseDown={() => setShowTerms(false)}>
+          <section
+            className="terms-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="terms-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="terms-modal-header">
+              <div>
+                <span className="terms-modal-brand">TRAMOS</span>
+                <h2 id="terms-title">Syarat dan Ketentuan</h2>
+                <p>Berlaku sejak 13 Juni 2026</p>
+              </div>
+              <button
+                type="button"
+                className="terms-close-button"
+                aria-label="Tutup Syarat dan Ketentuan"
+                onClick={() => setShowTerms(false)}
+              >
+                ×
+              </button>
+            </header>
+
+            <div className="terms-modal-content">
+              <div className="terms-summary">
+                Dengan menggunakan TRAMOS, kamu setuju menggunakan layanan secara bertanggung
+                jawab dan menjaga keamanan akun serta data operasional.
+              </div>
+
+              <article>
+                <h3>1. Penggunaan layanan</h3>
+                <p>
+                  TRAMOS menyediakan dashboard operasional, chatbot dukungan, pemantauan layanan,
+                  dan pengelolaan laporan. Layanan hanya boleh digunakan untuk kebutuhan kerja
+                  yang sah dan sesuai kewenangan pengguna.
+                </p>
+              </article>
+
+              <article>
+                <h3>2. Akun dan keamanan</h3>
+                <p>
+                  Pengguna wajib memberikan informasi yang benar, menjaga kerahasiaan password
+                  dan kode verifikasi, serta segera melaporkan aktivitas akun yang mencurigakan.
+                  Setiap aktivitas melalui akun dianggap dilakukan oleh pemilik akun tersebut.
+                </p>
+              </article>
+
+              <article>
+                <h3>3. Data dan privasi</h3>
+                <p>
+                  TRAMOS dapat memproses identitas pengguna, nomor kontak, percakapan dukungan,
+                  informasi kendaraan, lokasi yang dilaporkan, dan data tiket untuk menjalankan
+                  layanan, analitik, keamanan, dan peningkatan kualitas sistem.
+                </p>
+              </article>
+
+              <article>
+                <h3>4. Penggunaan AI</h3>
+                <p>
+                  Jawaban chatbot bersifat bantuan awal dan dapat memerlukan verifikasi operator.
+                  Untuk keadaan darurat, keselamatan jalan, atau keputusan operasional penting,
+                  pengguna wajib mengikuti SOP perusahaan dan menghubungi petugas yang berwenang.
+                </p>
+              </article>
+
+              <article>
+                <h3>5. Larangan</h3>
+                <p>
+                  Pengguna dilarang menyalahgunakan layanan, mencoba mengakses data tanpa izin,
+                  mengganggu sistem, memasukkan informasi palsu, membagikan kredensial, atau
+                  menggunakan TRAMOS untuk tindakan yang melanggar hukum.
+                </p>
+              </article>
+
+              <article>
+                <h3>6. Ketersediaan dan perubahan layanan</h3>
+                <p>
+                  Layanan dapat mengalami pemeliharaan, pembaruan, atau gangguan di luar kendali.
+                  Fitur dan ketentuan dapat diperbarui untuk mengikuti kebutuhan operasional,
+                  keamanan, dan ketentuan hukum yang berlaku.
+                </p>
+              </article>
+
+              <article>
+                <h3>7. Penghentian dan penghapusan akun</h3>
+                <p>
+                  Akses dapat dibatasi jika terjadi pelanggaran, risiko keamanan, atau permintaan
+                  organisasi. Pengguna dapat mengajukan penghapusan akun melalui menu profil,
+                  dengan tetap memperhatikan kewajiban penyimpanan data operasional.
+                </p>
+              </article>
+
+              <article>
+                <h3>8. Dukungan</h3>
+                <p>
+                  Pertanyaan mengenai akun, data, atau layanan dapat disampaikan kepada
+                  administrator TRAMOS atau tim dukungan perusahaan.
+                </p>
+              </article>
+            </div>
+
+            <footer className="terms-modal-footer">
+              <button type="button" className="terms-secondary-button" onClick={() => setShowTerms(false)}>
+                Tutup
+              </button>
+              {isSignUp && (
+                <button
+                  type="button"
+                  className="terms-accept-button"
+                  onClick={() => {
+                    setAcceptedTerms(true);
+                    setError('');
+                    setShowTerms(false);
+                  }}
+                >
+                  Saya Setuju
+                </button>
+              )}
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
