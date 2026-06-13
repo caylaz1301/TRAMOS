@@ -27,6 +27,7 @@ export default function Login({ onLoginSuccess }) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [accountPrompt, setAccountPrompt] = useState(false);
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
 
   // ── Reset state on mode toggle ──
   const toggleMode = (toSignUp) => {
@@ -458,7 +459,15 @@ export default function Login({ onLoginSuccess }) {
 
         {/* ── Sliding Image Door ── */}
         <div className="image-section">
-          <img src={`${import.meta.env.BASE_URL}loginpage.jpg`} alt="TRAMOS Logistics" className="luxury-bg-img" />
+          <img
+            src={`${import.meta.env.BASE_URL}loginpage.webp`}
+            alt="TRAMOS Logistics"
+            className={`luxury-bg-img ${heroImageLoaded ? 'is-loaded' : ''}`}
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
+            onLoad={() => setHeroImageLoaded(true)}
+          />
           <div className="image-overlay-gradient"></div>
         </div>
 

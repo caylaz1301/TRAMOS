@@ -60,6 +60,7 @@
   height: 100%;
   z-index: 10;
   overflow: hidden;
+  background: #dce5ed;
   transition: left 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   will-change: left;
 }
@@ -69,6 +70,12 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.luxury-bg-img.is-loaded {
+  opacity: 1;
 }
 
 .image-overlay-gradient {
