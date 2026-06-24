@@ -11,7 +11,7 @@ source: tramos_knowledge_base.txt, Form4 implementation proposal, observed TRAMO
 
 Dokumen ini adalah knowledge base untuk AI TRAMOS ketika menjawab pertanyaan operator, dispatcher, supervisor, management analyst, dan support operator. Dokumen ini juga menjadi sumber RAG untuk menjelaskan fitur dashboard TRAMOS, SOP monitoring armada, SOP eskalasi, penggunaan osTicket, dan batasan jawaban chatbot.
 
-## 1. Ringkasan Sistem
+## Ringkasan Sistem
 
 TRAMOS Systems adalah sistem monitoring operasional armada yang digunakan untuk memantau kendaraan, driver, task pengiriman, route, geofence, event safety, dashcam, camera snapshot, history perjalanan, dan report operasional.
 
@@ -24,7 +24,7 @@ Tujuan utama sistem:
 - Menjaga semua issue yang tidak selesai agar masuk ke ticketing system.
 - Memberikan analytics untuk management melalui dashboard.
 
-## 2. Role Pengguna
+## Role Pengguna
 
 Driver atau field staff:
 - Melapor lewat WhatsApp.
@@ -58,7 +58,7 @@ Management analyst:
 Admin:
 - Mengelola user, role, group, unit, driver, GPS device, API, webhook, dan integrasi.
 
-## 3. Prinsip Jawaban AI Untuk Operator
+## Prinsip Jawaban AI Untuk Operator
 
 AI harus:
 - Menjawab dengan bahasa Indonesia yang jelas, ringkas, dan operasional.
@@ -80,7 +80,7 @@ AI tidak boleh:
 Jawaban aman jika data realtime tidak tersedia:
 "Saya belum menerima data realtime untuk unit tersebut. Silakan masukkan nomor polisi, nama driver, task ref, atau group. Jika data live belum terhubung ke chatbot, cek melalui Realtime Monitor atau Task Monitor di dashboard TRAMOS."
 
-## 4. Dashboard Overview
+## Dashboard Overview
 
 Dashboard Overview adalah halaman ringkasan operasional TRAMOS AI Support System.
 
@@ -108,7 +108,7 @@ SOP jika AI success rate rendah:
 5. Jalankan dialog flow test.
 6. Pantau kembali metrik selama periode berikutnya.
 
-## 5. AI Performance Page
+## AI Performance Page
 
 AI Performance Page digunakan untuk mengevaluasi performa chatbot.
 
@@ -134,7 +134,7 @@ SOP evaluasi AI:
 5. Uji dengan terminal test.
 6. Monitor perubahan angka AI success rate.
 
-## 6. Reports and Notifications Page
+## Reports and Notifications Page
 
 Halaman Reports and Notifications digunakan untuk memantau health sistem dan insight mingguan.
 
@@ -156,7 +156,7 @@ SOP jika ada status service bermasalah:
 4. osTicket error: cek base URL, API key, endpoint, dan akses IP.
 5. Jika error berulang, buat ticket internal untuk admin teknis.
 
-## 7. Task Monitor / TMS
+## Task Monitor / TMS
 
 Task Monitor atau TMS adalah halaman untuk memantau pekerjaan kendaraan.
 
@@ -203,7 +203,7 @@ Arti tombol:
 - Checkpoint: menampilkan titik checkpoint.
 - Geofence: menampilkan area virtual.
 
-## 8. Realtime Monitor
+## Realtime Monitor
 
 Realtime Monitor digunakan untuk melihat posisi unit saat ini.
 
@@ -244,7 +244,7 @@ SOP GPS delayed/offline:
 5. Buka History untuk melihat data terakhir.
 6. Buat ticket teknis jika delayed tidak normal.
 
-## 9. History
+## History
 
 History digunakan untuk melihat perjalanan masa lalu.
 
@@ -276,7 +276,7 @@ Kapan menggunakan History:
 - Membuktikan arrival/departure.
 - Audit geofence enter/exit.
 
-## 10. Report
+## Report
 
 Report digunakan untuk rekap operasional.
 
@@ -311,7 +311,7 @@ Jika report kosong:
 4. Cek apakah data GPS tersedia pada periode tersebut.
 5. Coba report lain seperti History untuk validasi.
 
-## 11. Speeding SOP
+## Speeding SOP
 
 Speeding adalah event ketika unit melewati batas kecepatan.
 
@@ -327,7 +327,7 @@ SOP cek speeding:
 
 AI tidak boleh menyatakan driver bersalah tanpa bukti lengkap. AI hanya boleh mengatakan event perlu dicek berdasarkan data.
 
-## 12. Geofence
+## Geofence
 
 Geofence adalah area virtual di peta.
 
@@ -356,7 +356,7 @@ SOP cek geofence:
 5. Bandingkan dengan task origin/destination.
 6. Gunakan report geofence jika perlu rekap.
 
-## 13. Camera Snapshot / PhotoCam
+## Camera Snapshot / PhotoCam
 
 Camera Snapshot adalah bukti foto event.
 
@@ -381,7 +381,7 @@ Jika snapshot tidak muncul:
 4. Cek storage/perizinan kamera.
 5. Eskalasi teknis jika kamera tidak terdeteksi.
 
-## 14. Dashcam Monitor
+## Dashcam Monitor
 
 Dashcam Monitor digunakan untuk live video atau review video event.
 
@@ -403,7 +403,7 @@ SOP cek dashcam:
 5. Ambil snapshot/download jika fitur tersedia.
 6. Jika offline, cek last update dan koneksi perangkat.
 
-## 15. osTicket Integration
+## osTicket Integration
 
 osTicket adalah sistem ticketing untuk issue yang tidak selesai oleh chatbot.
 
@@ -440,7 +440,7 @@ Priority guideline:
 - Medium: issue normal yang perlu support.
 - Low: pertanyaan umum atau issue minor.
 
-## 16. SOP Eskalasi
+## SOP Eskalasi
 
 Eskalasi ke ticket diperlukan jika:
 - AI tidak punya solusi.
@@ -466,19 +466,17 @@ SOP sebelum membuat ticket:
 6. Minta konfirmasi.
 7. Buat ticket setelah user setuju.
 
-## 17. Batasan Data Realtime
+## Batasan Data Realtime
 
 Jika AI belum terhubung ke API live TRAMOS Systems, AI harus mengatakan bahwa data live belum tersedia.
 
-Contoh jawaban:
-"Saya bisa bantu arahkan cara ceknya, tetapi saya belum punya akses data realtime untuk menyebut lokasi unit sekarang. Silakan buka Realtime Monitor dan cari nomor polisi tersebut, atau kirim nomor polisi agar saya bantu susun langkah pengecekannya."
 
 AI tidak boleh:
 - "Unit B1234AB sedang di Jakarta" tanpa data live.
 - "Driver pasti speeding" tanpa bukti report.
 - "Task sudah selesai" tanpa status live.
 
-## 18. Pertanyaan Umum Operator
+## Pertanyaan Umum Operator
 
 Pertanyaan: Cara cek posisi kendaraan?
 Jawaban: Buka Realtime Monitor, cari nomor polisi atau nama driver, klik unit atau marker, lalu cek detail lokasi, speed, status, dan last update.
@@ -498,7 +496,7 @@ Jawaban: Speeding notification adalah alarm event saat kendaraan melewati batas 
 Pertanyaan: Kenapa unit tidak update?
 Jawaban: Kemungkinan perangkat GPS offline, sinyal lemah, power bermasalah, SIM/network bermasalah, atau server belum menerima data. Cek last update dan lakukan SOP GPS delayed.
 
-## 19. Data Yang Sebaiknya Dikaitkan Dengan Chatbot
+## Data Yang Sebaiknya Dikaitkan Dengan Chatbot
 
 Vehicle data:
 - plate_number.
@@ -545,7 +543,7 @@ Ticket data:
 - updated_at.
 - assigned_operator.
 
-## 20. Prompt Constraint Untuk RAG
+## Prompt Constraint Untuk RAG
 
 Saat menjawab dengan knowledge base:
 - Gunakan konteks KB yang diberikan.
@@ -555,7 +553,7 @@ Saat menjawab dengan knowledge base:
 - Selalu bedakan instruksi umum dan data realtime.
 - Jangan mengarang.
 
-## 21. SOP Re-ingest Knowledge Base
+## SOP Re-ingest Knowledge Base
 
 Saat ada perubahan SOP:
 1. Edit file di folder `knowledge_base`.
@@ -565,6 +563,6 @@ Saat ada perubahan SOP:
 5. Jalankan golden questions.
 6. Restart backend jika service memakai cache.
 
-## 22. Penutup
+## Penutup
 
 Knowledge base ini menjadi rujukan utama untuk operator dan dashboard TRAMOS. Untuk pertanyaan driver lapangan, gunakan juga dokumen `tramos_driver_chatbot_kb.txt` karena bahasanya lebih cocok untuk percakapan WhatsApp.

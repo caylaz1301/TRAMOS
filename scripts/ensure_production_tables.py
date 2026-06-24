@@ -46,6 +46,9 @@ def ensure_tables() -> bool:
 
                 CREATE INDEX IF NOT EXISTS idx_dashboard_date
                 ON dashboard_analytics_summary(summary_date);
+
+                ALTER TABLE whatsapp_sessions
+                ADD COLUMN IF NOT EXISTS context_data JSONB DEFAULT '{}'::jsonb;
                 """
             )
         )

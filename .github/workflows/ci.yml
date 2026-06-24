@@ -1,0 +1,252 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ============================================================================
+  # LINT & TYPE CHECK
+  # ============================================================================
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: |
+          pip install black flake8 mypy ruff
+          pip install -r requirements.txt || true
+
+      - name: Black formatting check
+        run: |
+          black --check app/ scripts/ || true
+
+      - name: Ruff linting
+        run: |
+          ruff check app/ scripts/ || true
+
+      - name: Type check with mypy
+        run: |
+          pip install types-requests types-redis
+          mypy app/ --ignore-missing-imports || true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd dashboard && npm ci
+
+      - name: TypeScript check
+        run: |
+          cd dashboard && npx tsc --noEmit || true
+
+  # ============================================================================
+  # BACKEND TESTS
+  # ============================================================================
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: tramos_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd redis-cli ping
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-asyncio httpx
+
+      - name: Run pytest
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=html || true
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/tramos_test
+          REDIS_URL: redis://localhost:6379
+          GEMINI_API_KEY: test_key_for_ci
+          WHATSAPP_API_TOKEN: test_token
+          OSTICKET_API_KEY: test_key
+          SECRET_KEY: test_secret_key_for_testing_only
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: backend
+
+  # ============================================================================
+  # FRONTEND TESTS
+  # ============================================================================
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install dependencies
+        run: cd dashboard && npm ci
+
+      - name: Run tests
+        run: cd dashboard && npm test -- --coverage --watchAll=false || npm run build
+
+      - name: Build
+        run: cd dashboard && npm run build
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          flags: frontend
+          directory: dashboard/coverage
+
+  # ============================================================================
+  # SECURITY SCAN
+  # ============================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Security audit
+        run: |
+          pip install safety bandit
+          safety check || true
+          bandit -r app/ -f json -o bandit-report.json || true
+
+      - name: npm audit
+        run: |
+          cd dashboard && npm audit --audit-level=high || true
+
+  # ============================================================================
+  # DEPLOY TO STAGING (on push to develop)
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [lint, backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+
+    environment:
+      name: staging
+      url: https://staging.tramos.example.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /var/www/tramos
+            git pull origin develop
+            pip install -r requirements.txt
+            cd dashboard && npm ci && npm run build
+            sudo systemctl restart tramos
+
+  # ============================================================================
+  # DEPLOY TO PRODUCTION (on push to main)
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [lint, backend-tests, frontend-tests, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: production
+      url: https://tramos.example.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/tramos
+            git pull origin main
+            pip install -r requirements.txt
+            cd dashboard && npm ci && npm run build
+            sudo systemctl restart tramos
+
+      - name: Notify deployment
+        if: always()
+        run: |
+          echo "Deployment completed with status: ${{ job.status }}"

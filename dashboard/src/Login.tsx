@@ -30,6 +30,7 @@ export default function Login({ onLoginSuccess }) {
   const [heroImageLoaded, setHeroImageLoaded] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
 
   useEffect(() => {
     if (!showTerms) return undefined;
@@ -82,21 +83,37 @@ export default function Login({ onLoginSuccess }) {
     } catch (err) {
       const detail = err.response?.data?.detail;
       const httpStatus = err.response?.status;
-      if (
-        httpStatus === 401 &&
-        typeof detail === 'string' &&
-        (detail.toLowerCase().includes('belum terdaftar') ||
-          detail.toLowerCase().includes('tidak ditemukan'))
-      ) {
-        setAccountPrompt(true);
-        setError('Akun Google ini belum terdaftar. Buat akun terlebih dahulu untuk masuk.');
-      } else {
-        setError(typeof detail === 'string' ? detail : 'Google login gagal. Coba lagi.');
+
+      // Account exists but not verified → show OTP screen directly
+      if (httpStatus === 403 || (typeof detail === 'string' && detail.includes('belum diverifikasi'))) {
+        const emailFromResponse = err.response?.data?.email || email || '';
+        setPendingEmail(emailFromResponse.toLowerCase());
+        setIsSignUp(true);
+        setSignUpStep('otp');
+        setSuccess(detail || 'Kode verifikasi telah dikirim ke email kamu. Masukkan kode untuk verifikasi.');
+        setError('');
+        return;
       }
+
+      // Account doesn't exist → show "belum terdaftar" prompt
+      if (httpStatus === 401 || httpStatus === 404) {
+        setAccountPrompt(true);
+        setError(typeof detail === 'string' ? detail : 'Akun Google ini belum terdaftar. Gunakan "Sign up with Google" untuk daftar.');
+        return;
+      }
+
+      // Network/other errors
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('CERT_AUTHORITY_INVALID') || !err.response) {
+        setError('Tidak dapat terhubung ke server. Periksa koneksi internet dan coba lagi.');
+        return;
+      }
+
+      // Fallback: show backend detail if available
+      setError(typeof detail === 'string' ? detail : 'Google login gagal. Coba lagi.');
     } finally {
       setLoading(false);
     }
-  }, [onLoginSuccess, isSignUp]);
+  }, [onLoginSuccess, isSignUp, email]);
 
   // Initialize Google Identity Services
   useEffect(() => {
@@ -113,6 +130,7 @@ export default function Login({ onLoginSuccess }) {
           auto_select: false,
           cancel_on_tap_outside: true,
         });
+        setGoogleReady(true);
       }
     };
 
@@ -156,7 +174,7 @@ export default function Login({ onLoginSuccess }) {
   };
 
   // ═══════════════════════════════════════════════
-  // SIGN IN
+  // SIGN IN (Email + Password)
   // ═══════════════════════════════════════════════
 
   const handleSignIn = async (e) => {
@@ -173,20 +191,57 @@ export default function Login({ onLoginSuccess }) {
     } catch (err) {
       const detail = err.response?.data?.detail;
       const httpStatus = err.response?.status;
-      if (httpStatus === 403) {
-        // Account not verified
+      const detailStr = typeof detail === 'string' ? detail.toLowerCase() : '';
+
+      // Case 1: Account not verified (403) → show OTP screen
+      if (httpStatus === 403 || detailStr.includes('verifikasi') || detailStr.includes('diverifikasi')) {
         setPendingEmail(email.trim().toLowerCase());
-        setError(typeof detail === 'string' ? detail : 'Akun belum diverifikasi.');
-      } else if (httpStatus === 401 && typeof detail === 'string' && detail.toLowerCase().includes('akun tidak ditemukan')) {
-        setAccountPrompt(true);
-        setError('Akun belum terdaftar. Buat akun terlebih dahulu untuk masuk ke dashboard TRAMOS.');
-      } else if (typeof detail === 'string') {
-        setError(detail);
-      } else if (err.code === 'ERR_NETWORK') {
-        setError('Tidak dapat terhubung ke server.');
-      } else {
-        setError('Login gagal. Silakan coba lagi.');
+        setIsSignUp(true);
+        setSignUpStep('otp');
+        setSuccess(detail || 'Akun belum diverifikasi. Masukkan kode OTP yang dikirim ke email kamu.');
+        setError('');
+        setLoading(false);
+        return;
       }
+
+      // Case 2: Account not found / not registered (401 or 404)
+      if (httpStatus === 401 || httpStatus === 404 ||
+          detailStr.includes('tidak ditemukan') ||
+          detailStr.includes('belum terdaftar') ||
+          detailStr.includes('tidak ada')) {
+        setAccountPrompt(true);
+        setError(detail || 'Akun belum terdaftar. Gunakan "Sign up" untuk membuat akun baru.');
+        setLoading(false);
+        return;
+      }
+
+      // Case 3: Wrong password (401 with specific message)
+      if (httpStatus === 401 && (
+          detailStr.includes('password salah') ||
+          detailStr.includes('salah') ||
+          detailStr.includes('credential')
+      )) {
+        setError('Password salah. Periksa kembali password kamu.');
+        setLoading(false);
+        return;
+      }
+
+      // Case 4: Google-only account trying email login
+      if (httpStatus === 401 && detailStr.includes('google')) {
+        setError('Akun ini terdaftar via Google. Gunakan tombol "Sign in with Google" untuk masuk.');
+        setLoading(false);
+        return;
+      }
+
+      // Case 5: Network error
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Tidak dapat terhubung ke server. Periksa koneksi internet.');
+        setLoading(false);
+        return;
+      }
+
+      // Case 6: Show backend detail if available
+      setError(typeof detail === 'string' ? detail : 'Login gagal. Silakan coba lagi.');
     } finally { setLoading(false); }
   };
 
@@ -314,9 +369,9 @@ export default function Login({ onLoginSuccess }) {
 
   const GoogleButton = ({ label }) => (
     <div className="sso-buttons">
-      <button type="button" onClick={handleGoogleLogin} className="btn-sso btn-sso-google" disabled={loading}>
+      <button type="button" onClick={handleGoogleLogin} className="btn-sso btn-sso-google" disabled={loading || !googleReady}>
         <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
-        {label || 'Continue with Google'}
+        {!googleReady ? 'Memuat Google...' : (label || 'Continue with Google')}
       </button>
     </div>
   );

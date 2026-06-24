@@ -4,12 +4,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background-color: #ffffff;
+  background-color: var(--bg-card);
   padding: 16px 24px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .filter-presets {
@@ -18,26 +18,26 @@
 }
 
 .filter-btn {
-  background-color: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--t-fast);
 }
 
 .filter-btn:hover {
-  background-color: #e5e7eb;
-  color: #1f2937;
+  background-color: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .filter-btn.active {
-  background-color: #3b82f6;
-  color: #ffffff;
-  border-color: #3b82f6;
+  background-color: var(--accent);
+  color: var(--text-inverse);
+  border-color: var(--accent);
 }
 
 .custom-range-container {
@@ -49,52 +49,52 @@
 
 .custom-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .date-input {
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   font-size: 14px;
-  color: #1f2937;
+  color: var(--text-primary);
   outline: none;
-  background-color: #ffffff;
-  transition: border-color 0.2s ease;
+  background-color: var(--bg-card);
+  transition: border-color var(--t-fast);
 }
 
 .date-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
 }
 
 .range-separator {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-weight: 500;
 }
 
 .apply-btn {
-  background-color: #f3f4f6;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
+  background-color: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--t-fast);
 }
 
 .apply-btn:not(:disabled):hover {
-  background-color: #e5e7eb;
-  color: #1f2937;
+  background-color: var(--bg-card-hover);
+  color: var(--text-primary);
 }
 
 .apply-btn.active {
-  background-color: #10b981;
-  color: #ffffff;
-  border-color: #10b981;
+  background-color: var(--emerald);
+  color: var(--text-inverse);
+  border-color: var(--emerald);
 }
 
 .apply-btn:disabled {

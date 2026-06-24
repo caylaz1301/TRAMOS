@@ -75,6 +75,13 @@ class Settings:
     # ===== Database Configuration =====
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5434/tramos_db")
 
+    # ===== Redis / WhatsApp Coordination =====
+    # Redis dipakai untuk deduplikasi webhook dan lock per nomor WhatsApp.
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    WHATSAPP_DEDUP_TTL_SECONDS: int = _env_int("WHATSAPP_DEDUP_TTL_SECONDS", "86400")
+    WHATSAPP_TURN_LOCK_TIMEOUT_SECONDS: int = _env_int("WHATSAPP_TURN_LOCK_TIMEOUT_SECONDS", "30")
+    WHATSAPP_TURN_LOCK_TTL_SECONDS: int = _env_int("WHATSAPP_TURN_LOCK_TTL_SECONDS", "180")
+
     # ===== AI / LLM Configuration =====
     LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
@@ -157,6 +164,8 @@ class Settings:
             warnings.append("WEBHOOK_VERIFY_TOKEN masih memakai default.")
         if self.CORS_ORIGINS == ["*"] and self.is_production:
             warnings.append("CORS_ORIGINS masih wildcard pada environment production.")
+        if not self.REDIS_URL and self.is_production:
+            warnings.append("REDIS_URL belum diisi; lock percakapan lintas worker tidak tersedia.")
         return warnings
 
 

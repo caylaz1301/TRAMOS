@@ -388,13 +388,15 @@ class SmartResponseSystem:
     # ========== UTILITY METHODS (from whatsapp_formatter) ==========
     
     def greeting(self, name: str = None) -> str:
-        """Format greeting message with time-based salutation"""
-        hour = datetime.now().hour
+        """Format greeting message with real-time Indonesian timezone (WIB = UTC+7) salutation"""
+        # VPS server uses UTC, Indonesia = UTC+7
+        hour_utc = datetime.utcnow().hour
+        hour_wib = (hour_utc + 7) % 24
         time_greeting = (
-            "Pagi" if hour < 12 else
-            "Siang" if hour < 17 else
-            "Sore" if hour < 19 else
-            "Malam"
+            "Pagi" if hour_wib < 12 else
+            "Siang" if hour_wib < 17 else
+            "Sore" if hour_wib < 19 else
+            "Malem"
         )
         
         message = f"Selamat {time_greeting}! 👋\n\n"
@@ -443,16 +445,16 @@ class SmartResponseSystem:
         return message.strip()
     
     def format_question(self, question: str, options: Optional[List[str]] = None, example: str = None) -> str:
-        """Format question with options"""
+        """Format question with options (numbered menus removed — users describe naturally)."""
         message = f"🤔 {question}\n\n"
-        
+
         if options:
             for i, option in enumerate(options, 1):
                 message += f"{i}️⃣ {option}\n"
-            message += "\n(Kirim nomor atau jawab langsung)"
+            message += "\n(Jawab langsung saja, tidak perlu kirim nomor)"
         elif example:
             message += f"Contoh: {example}\n"
-        
+
         return message.strip()
     
     def format_confirmation(self, title: str, details: Dict[str, str], action: str = "Konfirmasi") -> str:
@@ -547,8 +549,26 @@ class SmartResponseSystem:
         # Add footer if requested
         if add_footer and message_type != MessageType.CONFIRMATION:
             message = self.add_footer(message)
-        
+
         return message
+
+    @staticmethod
+    def problem_prompt(prefix: str = "") -> str:
+        """Format problem prompt message with optional prefix."""
+        message = ""
+        if prefix:
+            message += f"{prefix}\n\n"
+        message += (
+            "Ceritakan kendala yang dialami unit Anda.\n\n"
+            "Boleh pakai kata-kata sendiri, tidak perlu format khusus.\n"
+            "Contoh:\n"
+            '• "GPS tidak update lokasi"\n'
+            '• "Kamera mati di Unit B 1234"\n'
+            '• "Kendaraan oli rem bocor di Tol Cipularang"\n'
+            '• "Aplikasi error saat buka menu laporan"\n\n'
+            "Silakan langsung ketik saja ya."
+        )
+        return smart_response_system.format_for_whatsapp(message)
 
 
 # Singleton instance

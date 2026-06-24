@@ -31,7 +31,10 @@ class DialogState(Enum):
     COLLECTING_UNIT = "collecting_unit"
     COLLECTING_LOCATION = "collecting_location"
     COLLECTING_TIME = "collecting_time"
+    COLLECTING_CORRECTION = "collecting_correction"
+    COLLECTING_REALTIME_REFERENCE = "collecting_realtime_reference"
     CONFIRMING_DETAILS = "confirming_details"
+    CORRECTING_DETAILS = "correcting_details"
     CREATING_TICKET = "creating_ticket"
     RESOLVED = "resolved"
     CLOSED = "closed"
@@ -70,6 +73,10 @@ class ConversationSession:
         self.ticket_created = False
         self.ticket_id: Optional[str] = None
         self.ticket_retry_count: int = 0  # Track retry attempts untuk escape hatch
+        self.correction_target: Optional[str] = None
+        self.correction_mode: bool = False  # Flag for correction flow
+        self.interaction_mode: Optional[str] = None
+        self.last_intent: Optional[str] = None
         
         # Database tracking IDs (recovered via get_or_create on cache miss)
         self._db_conversation_id: Optional[int] = None
@@ -112,8 +119,30 @@ class ConversationSession:
             "issue_time": self.issue_time,
             "ticket_created": self.ticket_created,
             "ticket_id": self.ticket_id,
+            "correction_target": self.correction_target,
+            "interaction_mode": self.interaction_mode,
+            "last_intent": self.last_intent,
             "conversation_history": self.conversation_history
         }
+
+    def clear_issue_data(self) -> None:
+        """Bersihkan context kasus tanpa menghapus identitas driver."""
+        self.problem_description = None
+        self.problem_category = None
+        self.problem_severity = "medium"
+        self.vehicle_unit = None
+        self.location = None
+        self.issue_time = None
+        self.kb_solution = None
+        self.solution_step_current = 0
+        self.solution_worked = False
+        self.tried_kb_solution = False
+        self.ticket_created = False
+        self.ticket_id = None
+        self.ticket_retry_count = 0
+        self.correction_target = None
+        self.interaction_mode = None
+        self.last_intent = None
 
 
 class SessionManager:
@@ -135,6 +164,18 @@ class SessionManager:
             try:
                 db = self.db_session()
                 expires_at = datetime.now() + timedelta(seconds=SESSION_TIMEOUT)
+
+                # Hanya boleh ada satu session aktif per nomor.
+                db.query(WhatsAppSession).filter(
+                    WhatsAppSession.phone_number == phone_number,
+                    WhatsAppSession.is_active.is_(True),
+                ).update(
+                    {
+                        WhatsAppSession.is_active: False,
+                        WhatsAppSession.closed_at: datetime.now(),
+                    },
+                    synchronize_session=False,
+                )
                 
                 db_session = WhatsAppSession(
                     session_id=session_id,
@@ -157,9 +198,16 @@ class SessionManager:
         
         return session
     
-    def get_session(self, phone_number: str) -> Optional[ConversationSession]:
+    def get_session(
+        self,
+        phone_number: str,
+        force_reload: bool = False,
+    ) -> Optional[ConversationSession]:
         """Get existing session from memory or DB"""
-        
+
+        if force_reload:
+            self.sessions.pop(phone_number, None)
+
         # Check memory cache first
         session = self.sessions.get(phone_number)
         
@@ -193,9 +241,13 @@ class SessionManager:
         
         return None
     
-    def get_or_create_session(self, phone_number: str) -> ConversationSession:
+    def get_or_create_session(
+        self,
+        phone_number: str,
+        force_reload: bool = False,
+    ) -> ConversationSession:
         """Get existing session or create new one - optimized"""
-        session = self.get_session(phone_number)
+        session = self.get_session(phone_number, force_reload=force_reload)
         if session is None:
             session = self.create_session(phone_number)
         else:
@@ -212,13 +264,17 @@ class SessionManager:
             db = None
             try:
                 db = self.db_session()
-                db_session = db.query(WhatsAppSession).filter_by(
-                    phone_number=phone_number
-                ).first()
-                if db_session:
-                    db_session.is_active = False
-                    db_session.closed_at = datetime.now()
-                    db.commit()
+                db.query(WhatsAppSession).filter(
+                    WhatsAppSession.phone_number == phone_number,
+                    WhatsAppSession.is_active.is_(True),
+                ).update(
+                    {
+                        WhatsAppSession.is_active: False,
+                        WhatsAppSession.closed_at: datetime.now(),
+                    },
+                    synchronize_session=False,
+                )
+                db.commit()
             except Exception as e:
                 logger.error(f"❌ Error closing session in DB: {e}")
             finally:
@@ -253,6 +309,16 @@ class SessionManager:
                 db_session.issue_time = session.issue_time
                 db_session.message_count = session.message_count
                 db_session.conversation_history = session.conversation_history
+                db_session.context_data = {
+                    "kb_solution": session.kb_solution,
+                    "solution_step_current": session.solution_step_current,
+                    "solution_worked": session.solution_worked,
+                    "tried_kb_solution": session.tried_kb_solution,
+                    "ticket_retry_count": session.ticket_retry_count,
+                    "correction_target": session.correction_target,
+                    "interaction_mode": session.interaction_mode,
+                    "last_intent": session.last_intent,
+                }
                 db_session.ticket_created = session.ticket_created
                 db_session.ticket_id = session.ticket_id
                 if session.ticket_id:
@@ -315,6 +381,17 @@ class SessionManager:
             session.ticket_created = db_session.ticket_created
             session.ticket_id = db_session.ticket_id
             session.last_activity = db_session.last_activity or datetime.now()
+            session.created_at = db_session.created_at or datetime.now()
+
+            context = db_session.context_data or {}
+            session.kb_solution = context.get("kb_solution")
+            session.solution_step_current = int(context.get("solution_step_current") or 0)
+            session.solution_worked = bool(context.get("solution_worked", False))
+            session.tried_kb_solution = bool(context.get("tried_kb_solution", False))
+            session.ticket_retry_count = int(context.get("ticket_retry_count") or 0)
+            session.correction_target = context.get("correction_target")
+            session.interaction_mode = context.get("interaction_mode")
+            session.last_intent = context.get("last_intent")
 
             return session
         except Exception as e:

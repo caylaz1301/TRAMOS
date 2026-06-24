@@ -319,10 +319,16 @@ img { max-width: 100%; }
 }
 
 .no-data-icon {
-  font-size: 36px;
   margin-bottom: 8px;
-  display: block;
+  display: flex;
+  justify-content: center;
   opacity: 0.7;
+}
+
+.no-data-icon svg {
+  width: 36px;
+  height: 36px;
+  stroke: currentColor;
 }
 
 /* ── Logout Confirmation Modal ── */

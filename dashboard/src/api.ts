@@ -312,11 +312,12 @@ export const analyticsService = {
     return response.data;
   },
 
-  // Activity Log (new)
-  getActivityLog: async (limit = 20) => {
-    const response = await api.get('/analytics/activity-log', {
-      params: { limit }
-    });
+  // Activity Log - supports date filtering and limit
+  getActivityLog: async (limit = 20, startDate?: string | null, endDate?: string | null) => {
+    const params: Record<string, unknown> = { limit };
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    const response = await api.get('/analytics/activity-log', { params });
     return response.data;
   },
 

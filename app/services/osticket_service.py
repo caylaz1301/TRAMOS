@@ -60,8 +60,8 @@ class osTicketService:
                 try:
                     ticket_id = response.text.strip()
                     logger.info(f"✅ Ticket created successfully: {ticket_id}")
-                    
-                    # Send email notification to operators
+
+                    # Prepare email notification data
                     ticket_notification_data = {
                         'ticket_id': ticket_id,
                         'subject': ticket_data.subject,
@@ -72,14 +72,19 @@ class osTicketService:
                         'message': ticket_data.message,
                         'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     }
-                    
-                    # Send email asynchronously (non-blocking)
+
+                    # Send email notification to operators
+                    logger.info(f"📧 Attempting to send email notification for ticket #{ticket_id}...")
                     try:
-                        email_notification_service.send_new_ticket_notification(ticket_notification_data)
+                        email_result = email_notification_service.send_new_ticket_notification(ticket_notification_data)
+                        if email_result:
+                            logger.info(f"✅ Email notification sent successfully for ticket #{ticket_id}")
+                        else:
+                            logger.warning(f"⚠️ Email notification returned False for ticket #{ticket_id}")
                     except Exception as email_error:
-                        logger.warning(f"⚠️ Failed to send email notification: {str(email_error)}")
+                        logger.error(f"❌ Email notification failed for ticket #{ticket_id}: {str(email_error)}")
                         # Don't fail ticket creation if email fails
-                    
+
                     return CreateTicketResponse(
                         success=True,
                         ticket_id=str(ticket_id),

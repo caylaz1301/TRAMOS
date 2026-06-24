@@ -1,510 +1,465 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsService, benchmarkService } from '../api.js';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { analyticsService } from '../api.js';
 import DateFilter from '../components/DateFilter';
 import './InsightsPage.css';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
-
-const CHART_TOOLTIP = {
-  backgroundColor: '#ffffff',
-  titleColor: '#111827',
-  bodyColor: '#4b5563',
-  borderColor: '#e5e7eb',
-  borderWidth: 1,
-  cornerRadius: 8,
-  padding: 10,
-  titleFont: { weight: 600 },
+// SVG Icons
+const Icons = {
+  chart: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
+  check: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  ticket: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M15 5v2" />
+      <path d="M15 11v2" />
+      <path d="M15 17v2" />
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+    </svg>
+  ),
+  close: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+    </svg>
+  ),
+  chat: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  ),
+  activity: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  doc: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+  alert: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  empty: (
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="9" y1="9" x2="15" y2="15" />
+      <line x1="15" y1="9" x2="9" y2="15" />
+    </svg>
+  ),
+  robot: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <circle cx="12" cy="5" r="2" />
+      <path d="M12 7v4" />
+    </svg>
+  ),
+  star: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  ),
+  thumbsUp: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+  ),
+  warning: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  ),
+  alertCircle: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  ),
 };
 
 export default function InsightsPage() {
-  const [alerts, setAlerts] = useState(null);
-  const [health, setHealth] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
-  const [mlInsights, setMlInsights] = useState(null);
-  const [activityLog, setActivityLog] = useState(null);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [activityLog, setActivityLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null });
-
-  const fetchData = async () => {
-    try {
-      setError(null);
-      setLoading(true);
-      const [alertsData, healthData, dashData, mlData, logData] = await Promise.all([
-        analyticsService.getActiveAlerts().catch(() => null),
-        analyticsService.getHealthCheck().catch(() => null),
-        analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
-        analyticsService.getMLInsights(dateRange.startDate, dateRange.endDate).catch(() => null),
-        analyticsService.getActivityLog(15).catch(() => null),
-      ]);
-      setAlerts(alertsData);
-      setHealth(healthData);
-      setDashboard(dashData);
-      setMlInsights(mlData);
-      setActivityLog(logData);
-    } catch (err) {
-      setError('Gagal memuat data laporan');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState({ startDate: null as string | null, endDate: null as string | null });
 
   useEffect(() => {
-    fetchData();
-  }, [dateRange]);
+    let cancelled = false;
 
-  if (loading) {
+    async function fetchData() {
+      try {
+        setError(null);
+        const [dashData, logData] = await Promise.all([
+          analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
+          analyticsService.getActivityLog(20, dateRange.startDate, dateRange.endDate).catch(() => ({ events: [] })),
+        ]);
+        if (!cancelled) {
+          setDashboard(dashData);
+          setActivityLog(logData?.events || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('Gagal memuat data laporan');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange.startDate, dateRange.endDate]);
+
+  if (loading && !dashboard) {
     return (
       <div className="page-loading">
         <div className="spinner" />
-        <p>Menyiapkan laporan...</p>
+        <p>Memuat laporan...</p>
       </div>
     );
   }
 
-  const alertsData = alerts || {};
-  const activeAlerts = alertsData.alerts || [];
-  const criticalCount = alertsData.critical_count || 0;
-  const warningCount = alertsData.warning_count || 0;
-
-  const healthData = health || {};
-  const components = healthData.components || {};
-
+  // Parse data dari API
   const overview = dashboard?.overview || {};
-  const quality = dashboard?.quality || {};
   const categories = dashboard?.categories?.categories || [];
+  const tickets = dashboard?.tickets || {};
+  const quality = dashboard?.quality || {};
+  const severity = dashboard?.severity?.severities || [];
 
+  // Core metrics
   const totalSessions = overview.total_sessions || 0;
+  const totalTickets = overview.total_tickets || 0;
   const totalMessages = overview.total_messages || 0;
-  const completionRate = quality.completion_rate || 0;
-  const avgDuration = Math.round((quality.avg_duration_seconds || 0) / 60);
+  const aiResolved = overview.ai_resolved_sessions || 0;
+  const activeSessions = overview.active_sessions || 0;
   const avgMessages = overview.avg_messages_per_session || 0;
+  const completionRate = quality.completion_rate || 0;
+  const abandoned = quality.abandoned_sessions || 0;
+  const avgDurationSec = Math.min(Math.max(quality.avg_duration_seconds || 0, 0), 3600);
+  const avgDurationMin = Math.round(avgDurationSec / 60);
 
-  // ML data
-  const ml = mlInsights || {};
-  const weeklyTrend = ml.weekly_trend || {};
-  const kbEffectiveness = ml.kb_effectiveness || {};
-  const topEscalated = ml.top_escalated || [];
-  const peakHours = ml.peak_hours || [];
-  const recommendations = ml.recommendations || [];
+  // Calculated metrics
+  const aiResolutionRate = totalSessions > 0 ? Math.round((aiResolved / totalSessions) * 100) : 0;
+  const escalationRate = totalSessions > 0 ? Math.round((totalTickets / totalSessions) * 100) : 0;
+  const abandonmentRate = totalSessions > 0 ? Math.round((abandoned / totalSessions) * 100) : 0;
 
-  // Activity log
-  const events = activityLog?.events || [];
+  // Format duration
+  const formatDuration = (min: number) => {
+    if (min === 0) return '<1m';
+    if (min < 60) return `${min}m`;
+    return `${Math.floor(min / 60)}j${min % 60 > 0 ? ` ${min % 60}m` : ''}`;
+  };
 
-  // System health status
-  const systemStatus = criticalCount > 0 ? 'critical' : warningCount > 0 ? 'warning' : 'healthy';
-  const statusLabels = { critical: 'Ada Masalah Kritis', warning: 'Ada Peringatan', healthy: 'Semua Berjalan Normal' };
-  const statusIcons = { critical: '🔴', warning: '🟡', healthy: '🟢' };
+  // Format time ago
+  const formatTimeAgo = (timestamp: string) => {
+    if (!timestamp) return '-';
+    try {
+      const ts = timestamp.endsWith('Z') ? timestamp : timestamp + 'Z';
+      const d = new Date(ts);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return 'Baru saja';
+      if (diffMin < 60) return `${diffMin} menit lalu`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr} jam lalu`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 7) return `${diffDay} hari lalu`;
+      return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+    } catch {
+      return '-';
+    }
+  };
 
-  // System components
-  const systemComponents = [
-    { name: 'Database', status: components.database || 'unknown', icon: '🗄️' },
-    { name: 'Gemini AI', status: components.ai_engine || 'unknown', icon: '🤖' },
-    { name: 'WhatsApp API', status: components.whatsapp_api || 'unknown', icon: '💬' },
-    { name: 'osTicket', status: components.osticket || 'unknown', icon: '🎫' },
-    { name: 'Knowledge Base RAG', status: components.knowledge_base || 'unknown', icon: '📚' },
+  // Event styling
+  const getEventStyle = (type: string) => {
+    if (type === 'ticket_created' || type === 'escalation') return { icon: Icons.ticket, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' };
+    if (type === 'session_resolved' || type === 'resolved') return { icon: Icons.check, color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)' };
+    if (type === 'session_created' || type === 'new_session') return { icon: Icons.chat, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' };
+    if (type === 'abandoned' || type === 'session_abandoned') return { icon: Icons.close, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' };
+    return { icon: Icons.doc, color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' };
+  };
+
+  // AI Assessment
+  let aiAssessment = {
+    level: 'poor',
+    label: 'Data Tidak Ada',
+    icon: Icons.alertCircle,
+    color: '#6b7280',
+    desc: 'Tidak ada data untuk ditampilkan.',
+  };
+
+  if (totalSessions > 0) {
+    if (aiResolutionRate >= 70 && abandonmentRate <= 10) {
+      aiAssessment = { level: 'excellent', label: 'Sangat Baik', icon: Icons.star, color: '#10b981', desc: 'AI chatbot bekerja dengan excellen. Resolusi tinggi dan abandonment rendah.' };
+    } else if (aiResolutionRate >= 50 && abandonmentRate <= 20) {
+      aiAssessment = { level: 'good', label: 'Baik', icon: Icons.thumbsUp, color: '#3b82f6', desc: 'Performa AI cukup baik. Masih ada ruang untuk peningkatan.' };
+    } else if (aiResolutionRate >= 30) {
+      aiAssessment = { level: 'fair', label: 'Perlu Perbaikan', icon: Icons.warning, color: '#f59e0b', desc: 'Tingkat eskalasi masih tinggi. Pertimbangkan tambah solusi Knowledge Base.' };
+    } else {
+      aiAssessment = { level: 'poor', label: 'Perlu Perhatian', icon: Icons.alertCircle, color: '#ef4444', desc: 'Banyak masalah memerlukan bantuan manusia. Perlu evaluasi serius.' };
+    }
+  }
+
+  // Top categories
+  const sortedCategories = [...categories].sort((a: any, b: any) => b.count - a.count).slice(0, 5);
+  const sortedEscalated = [...(tickets.by_category || [])].sort((a: any, b: any) => b.count - a.count).slice(0, 5);
+
+  // Summary stats
+  const summaryStats = [
+    { label: 'Total Sesi', value: totalSessions, icon: Icons.chat, color: 'blue' },
+    { label: 'Selesai', value: completionRate, suffix: '%', icon: Icons.check, color: 'emerald' },
+    { label: 'Dieskalasi', value: escalationRate, suffix: '%', icon: Icons.ticket, color: 'amber' },
+    { label: 'Dibatalkan', value: abandonmentRate, suffix: '%', icon: Icons.close, color: 'rose' },
   ];
-
-  // Build insights from data
-  const insights = buildInsights(overview, quality, categories, kbEffectiveness);
 
   return (
     <div className="insights-page">
+      {/* Header */}
       <div className="page-header">
         <div>
-          <h1>Laporan & Notifikasi</h1>
-          <p className="page-subtitle">Kesehatan sistem, analisis AI, dan rekomendasi operasional</p>
+          <h1>Laporan & Analisis</h1>
+          <p className="page-subtitle">Ringkasan performa AI chatbot dan aktivitas</p>
         </div>
-        <button className="btn-refresh" onClick={fetchData}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-          </svg>
-          Perbarui
-        </button>
       </div>
 
       <DateFilter onFilterChange={setDateRange} />
 
       {error && (
-        <div className="page-error">⚠️ {error}<button onClick={fetchData}>Coba Lagi</button></div>
+        <div className="page-error">
+          <p>{error}</p>
+          <button onClick={() => setDateRange({ ...dateRange })}>Coba Lagi</button>
+        </div>
       )}
 
-      {/* System Status Strip */}
-      <div className={`status-strip status-${systemStatus}`}>
-        <div className="status-left">
-          <span className="status-icon">{statusIcons[systemStatus]}</span>
-          <div>
-            <div className="status-title">{statusLabels[systemStatus]}</div>
-            <div className="status-sub">{activeAlerts.length > 0 ? `${activeAlerts.length} notifikasi aktif` : 'Tidak ada notifikasi'}</div>
-          </div>
+      {/* Empty State */}
+      {totalSessions === 0 && !loading && (
+        <div className="card empty-state">
+          <div className="empty-icon">{Icons.empty}</div>
+          <h3>Belum Ada Data</h3>
+          <p>Tidak ada percakapan dalam periode yang dipilih. Coba ubah filter tanggal.</p>
         </div>
-        <div className="status-right">
-          <span className="status-time">Terakhir dicek: {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-        </div>
-      </div>
+      )}
 
-      {/* Main Grid */}
-      <div className="insights-grid">
-        {/* Left Column */}
-        <div className="insights-col">
-          {/* System Health */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Status Sistem</h2>
+      {totalSessions > 0 && (
+        <>
+          {/* AI Performance Summary */}
+          <div className="card ai-summary-card">
+            <div className="ai-summary-header">
+              <div className="ai-summary-left">
+                <div className="ai-badge" style={{ background: aiAssessment.color }}>
+                  <span className="ai-badge-icon">{aiAssessment.icon}</span>
+                  <span className="ai-badge-label">{aiAssessment.label}</span>
+                </div>
+                <p className="ai-summary-desc">{aiAssessment.desc}</p>
+              </div>
+              <div className="ai-summary-score">
+                <span className="ai-score-value">{aiResolutionRate}%</span>
+                <span className="ai-score-label">AI Resolution</span>
+              </div>
             </div>
-            <div className="components-list">
-              {systemComponents.map((comp, i) => (
-                <div key={i} className="comp-row">
-                  <span className="comp-icon">{comp.icon}</span>
-                  <span className="comp-name">{comp.name}</span>
-                  <span className={`comp-status comp-${getCompStatusType(comp.status)}`}>
-                    {getCompStatusLabel(comp.status)}
+
+            {/* Summary Stats Row */}
+            <div className="summary-stats-row">
+              {summaryStats.map((stat, i) => (
+                <div key={i} className={`summary-stat stat-${stat.color}`}>
+                  <span className="stat-icon">{stat.icon}</span>
+                  <span className="stat-value">
+                    {stat.value}
+                    {stat.suffix || ''}
                   </span>
+                  <span className="stat-label">{stat.label}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Notifications */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Notifikasi</h2>
-              <span className="card-badge">{activeAlerts.length}</span>
-            </div>
-            <div className="alerts-content">
-              {activeAlerts.length > 0 ? (
-                activeAlerts.slice(0, 5).map((alert, i) => (
-                  <div key={i} className={`alert-row alert-${alert.severity || 'info'}`}>
-                    <div className={`alert-dot dot-${alert.severity || 'info'}`} />
-                    <div className="alert-body">
-                      <div className="alert-title">{alert.title || alert.message || 'Notifikasi'}</div>
-                      <div className="alert-desc">{alert.description || alert.detail || ''}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="alerts-empty">
-                  <div className="empty-icon-wrap">✓</div>
-                  <p className="empty-title">Tidak Ada Notifikasi</p>
-                  <p className="empty-desc">Semua komponen berjalan normal.</p>
+          {/* Main Grid */}
+          <div className="insights-grid">
+            {/* Left Column */}
+            <div className="insights-col">
+              {/* Categories */}
+              <div className="card">
+                <div className="card-header">
+                  <h2>Kategori Masalah</h2>
+                  <span className="card-badge">{categories.length}</span>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* AI Recommendations */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Rekomendasi AI</h2>
-              <span className="card-badge">{recommendations.length}</span>
-            </div>
-            <div className="recommendations-content">
-              {recommendations.length > 0 ? (
-                recommendations.map((rec, i) => (
-                  <div key={i} className={`rec-row rec-${rec.priority}`}>
-                    <div className={`rec-priority priority-${rec.priority}`}>
-                      {rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}
-                    </div>
-                    <div className="rec-body">
-                      <div className="rec-type">{getRecTypeLabel(rec.type)}</div>
-                      <div className="rec-message">{rec.message}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="alerts-empty">
-                  <div className="empty-icon-wrap">👍</div>
-                  <p className="empty-title">Tidak Ada Rekomendasi</p>
-                  <p className="empty-desc">Sistem berjalan optimal. Akan ada rekomendasi jika terdeteksi area yang bisa ditingkatkan.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column */}
-        <div className="insights-col">
-          {/* ML Analytics Summary */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Analisis Machine Learning</h2>
-            </div>
-            <div className="ml-summary">
-              <div className="ml-stat">
-                <div className="ml-stat-header">
-                  <span className="ml-stat-label">Tren Volume Mingguan</span>
-                  <span className={`ml-trend trend-${weeklyTrend.direction || 'stable'}`}>
-                    {weeklyTrend.direction === 'up' ? '↑' : weeklyTrend.direction === 'down' ? '↓' : '→'} {Math.abs(weeklyTrend.change_percent || 0)}%
-                  </span>
-                </div>
-                <div className="ml-stat-detail">
-                  Minggu ini: <strong>{weeklyTrend.this_week || 0}</strong> sesi &bull; Minggu lalu: <strong>{weeklyTrend.last_week || 0}</strong> sesi
-                </div>
-                <div className="ml-trend-bar-wrap">
-                  <div className="ml-trend-bar">
-                    <div className="ml-trend-bar-last" style={{ width: `${Math.min(100, ((weeklyTrend.last_week || 0) / Math.max(1, weeklyTrend.this_week || 0, weeklyTrend.last_week || 0)) * 100)}%` }} />
-                  </div>
-                  <div className="ml-trend-bar">
-                    <div className="ml-trend-bar-this" style={{ width: `${Math.min(100, ((weeklyTrend.this_week || 0) / Math.max(1, weeklyTrend.this_week || 0, weeklyTrend.last_week || 0)) * 100)}%` }} />
-                  </div>
-                </div>
-              </div>
-              <div className="ml-stat">
-                <div className="ml-stat-header">
-                  <span className="ml-stat-label">Efektivitas AI Chatbot</span>
-                  <span className="ml-stat-value">{kbEffectiveness.ai_resolution_rate || 0}%</span>
-                </div>
-                <div className="ml-stat-detail">
-                  <span className="stat-chip chip-emerald">AI: {kbEffectiveness.resolved_by_ai || 0}</span>
-                  <span className="stat-chip chip-amber">Eskalasi: {kbEffectiveness.escalated || 0}</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${kbEffectiveness.ai_resolution_rate || 0}%` }} />
-                </div>
-                <div className="ml-stat-insight">
-                  {(kbEffectiveness.ai_resolution_rate || 0) >= 70
-                    ? '✅ AI menangani masalah dengan sangat baik'
-                    : (kbEffectiveness.ai_resolution_rate || 0) >= 40
-                      ? '⚠️ Perlu peningkatan solusi di Knowledge Base'
-                      : '🔴 Banyak masalah memerlukan bantuan manusia'}
-                </div>
-              </div>
-              {topEscalated.length > 0 && (
-                <div className="ml-stat">
-                  <div className="ml-stat-header">
-                    <span className="ml-stat-label">Kategori Sering Dieskalasi</span>
-                  </div>
-                  <div className="escalation-list">
-                    {topEscalated.slice(0, 5).map((cat, i) => (
-                      <div key={i} className="escalation-item">
-                        <span className="escalation-rank">#{i + 1}</span>
-                        <span className="escalation-name">{cat.category}</span>
-                        <div className="escalation-bar-track">
-                          <div className="escalation-bar-fill" style={{ width: `${Math.min(100, (cat.count / Math.max(1, topEscalated[0].count)) * 100)}%` }} />
+                <div className="category-list">
+                  {sortedCategories.length > 0 ? (
+                    sortedCategories.map((cat: any, i: number) => {
+                      const maxCount = sortedCategories[0]?.count || 1;
+                      const pct = Math.round((cat.count / maxCount) * 100);
+                      return (
+                        <div key={i} className="category-item">
+                          <div className="category-info">
+                            <span className="category-rank">#{i + 1}</span>
+                            <span className="category-name">{cat.name || 'Lainnya'}</span>
+                          </div>
+                          <div className="category-bar-wrap">
+                            <div className="category-bar-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="category-count">{cat.count}x</span>
                         </div>
-                        <span className="escalation-count">{cat.count}x</span>
-                      </div>
-                    ))}
+                      );
+                    })
+                  ) : (
+                    <div className="no-data">Belum ada data kategori</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Escalated Categories */}
+              <div className="card">
+                <div className="card-header">
+                  <h2>Top Escalasi</h2>
+                  <span className="card-badge">{totalTickets} tiket</span>
+                </div>
+                <div className="category-list">
+                  {sortedEscalated.length > 0 ? (
+                    sortedEscalated.map((cat: any, i: number) => {
+                      const maxCount = sortedEscalated[0]?.count || 1;
+                      const pct = Math.round((cat.count / maxCount) * 100);
+                      return (
+                        <div key={i} className="category-item escalated">
+                          <div className="category-info">
+                            <span className="category-rank escalated">#{i + 1}</span>
+                            <span className="category-name">{cat.category || 'Lainnya'}</span>
+                          </div>
+                          <div className="category-bar-wrap escalated">
+                            <div className="category-bar-fill escalated" style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="category-count escalated">{cat.count}x</span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="no-data">Belum ada tiket</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="insights-col">
+              {/* Activity Log */}
+              <div className="card">
+                <div className="card-header">
+                  <h2>Aktivitas Terbaru</h2>
+                  <span className="card-badge">{activityLog.length}</span>
+                </div>
+                <div className="activity-list">
+                  {activityLog.length > 0 ? (
+                    activityLog.slice(0, 10).map((evt: any, i: number) => {
+                      const style = getEventStyle(evt.type);
+                      return (
+                        <div key={i} className="activity-item" style={{ borderLeftColor: style.color, background: style.bg }}>
+                          <span className="activity-icon">{style.icon}</span>
+                          <div className="activity-content">
+                            <span className="activity-desc">{evt.description || 'Aktivitas'}</span>
+                            <span className="activity-meta">
+                              <span className="activity-time">{formatTimeAgo(evt.timestamp)}</span>
+                              {evt.category && <span className="activity-cat">{evt.category}</span>}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="no-data">Belum ada aktivitas</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="card">
+                <div className="card-header">
+                  <h2>Statistik</h2>
+                </div>
+                <div className="stats-grid">
+                  <div className="stat-item">
+                    <span className="stat-item-label">Pesan Total</span>
+                    <span className="stat-item-value">{totalMessages.toLocaleString('id-ID')}</span>
                   </div>
-                  <div className="ml-stat-insight">
-                    💡 Fokuskan penambahan solusi KB untuk kategori "{topEscalated[0]?.category}" agar eskalasi berkurang.
+                  <div className="stat-item">
+                    <span className="stat-item-label">Rata-rata Pesan</span>
+                    <span className="stat-item-value">{Math.round(avgMessages)}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-item-label">Durasi Rata-rata</span>
+                    <span className="stat-item-value">{formatDuration(avgDurationMin)}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-item-label">Sesi Aktif</span>
+                    <span className="stat-item-value">{activeSessions}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-item-label">Sesi AI Selesai</span>
+                    <span className="stat-item-value">{aiResolved}</span>
+                  </div>
+                  <div className="stat-item">
+                    <span className="stat-item-label">Tiket Dibuat</span>
+                    <span className="stat-item-value">{totalTickets}</span>
                   </div>
                 </div>
-              )}
-              {peakHours.length > 0 && (
-                <div className="ml-stat">
-                  <div className="ml-stat-header">
-                    <span className="ml-stat-label">Jam Sibuk (Peak Hours)</span>
-                  </div>
-                  <div className="peak-hours">
-                    {peakHours.slice(0, 6).map((ph, i) => (
-                      <div key={i} className={`peak-hour-badge ${i === 0 ? 'peak-primary' : ''}`}>
-                        <span className="peak-time">{String(ph.hour).padStart(2, '0')}:00</span>
-                        <span className="peak-count">{ph.count} sesi</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="ml-stat-insight">
-                    🕐 Jam tersibuk: {String(peakHours[0]?.hour || 0).padStart(2, '0')}:00 dengan {peakHours[0]?.count || 0} percakapan
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Data Insights */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Rangkuman Data</h2>
-            </div>
-            <div className="insights-content">
-              {insights.length > 0 ? (
-                insights.map((ins, i) => (
-                  <div key={i} className={`insight-row insight-${ins.type}`}>
-                    <div className={`insight-icon-wrap icon-${ins.type}`}>{ins.icon}</div>
-                    <div className="insight-body">
-                      <div className="insight-title">{ins.title}</div>
-                      <div className="insight-desc">{ins.desc}</div>
+          {/* Severity Distribution */}
+          {severity.length > 0 && (
+            <div className="card severity-card">
+              <div className="card-header">
+                <h2>Distribusi Urgensi</h2>
+                <span className="card-badge">{severity.reduce((a: number, s: any) => a + s.count, 0)}</span>
+              </div>
+              <div className="severity-bars">
+                {severity.map((sev: any, i: number) => {
+                  const total = severity.reduce((a: number, s: any) => a + s.count, 0);
+                  const pct = total > 0 ? Math.round((sev.count / total) * 100) : 0;
+                  const colors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', normal: '#3b82f6', low: '#10b981' };
+                  const labels: Record<string, string> = { critical: 'Kritis', high: 'Tinggi', medium: 'Sedang', normal: 'Normal', low: 'Rendah' };
+                  return (
+                    <div key={i} className="severity-row">
+                      <span className="severity-label" style={{ color: colors[sev.name] || '#6b7280' }}>
+                        {labels[sev.name] || sev.name}
+                      </span>
+                      <div className="severity-bar-track">
+                        <div className="severity-bar-fill" style={{ width: `${pct}%`, background: colors[sev.name] || '#6b7280' }} />
+                      </div>
+                      <span className="severity-count">{sev.count}</span>
+                      <span className="severity-pct">{pct}%</span>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-data">
-                  <span className="no-data-icon">📊</span>
-                  Belum ada cukup data untuk membuat rangkuman
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Activity Log */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Log Aktivitas</h2>
-              <span className="card-badge">{events.length}</span>
-            </div>
-            <div className="activity-log">
-              {events.length > 0 ? (
-                events.slice(0, 10).map((evt, i) => (
-                  <div key={i} className={`activity-row activity-${evt.type}`}>
-                    <span className="activity-icon">{evt.icon}</span>
-                    <div className="activity-body">
-                      <div className="activity-desc">{evt.description}</div>
-                      <div className="activity-time">
-                        {evt.timestamp ? formatTimeAgo(evt.timestamp) : '-'}
-                        {evt.severity && <span className={`activity-severity sev-${evt.severity}`}>{evt.severity}</span>}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="alerts-empty">
-                  <div className="empty-icon-wrap">📝</div>
-                  <p className="empty-title">Belum Ada Aktivitas</p>
-                  <p className="empty-desc">Log akan terisi otomatis saat ada percakapan dan tiket baru.</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Statistik Cepat</h2>
-            </div>
-            <div className="quick-stats">
-              <div className="qstat">
-                <div className="qstat-val">{totalSessions}</div>
-                <div className="qstat-label">Total Percakapan</div>
-              </div>
-              <div className="qstat">
-                <div className="qstat-val">{totalMessages.toLocaleString('id-ID')}</div>
-                <div className="qstat-label">Total Pesan</div>
-              </div>
-              <div className="qstat">
-                <div className="qstat-val">{categories.length}</div>
-                <div className="qstat-label">Kategori Masalah</div>
-              </div>
-              <div className="qstat">
-                <div className="qstat-val">{Math.round(avgMessages)}</div>
-                <div className="qstat-label">Pesan/Sesi</div>
-              </div>
-              <div className="qstat">
-                <div className="qstat-val">{avgDuration > 60 ? `${Math.round(avgDuration/60)}j` : `${avgDuration}m`}</div>
-                <div className="qstat-label">Durasi Rata-rata</div>
-              </div>
-              <div className="qstat">
-                <div className="qstat-val">{`${completionRate}%`}</div>
-                <div className="qstat-label">Tingkat Selesai</div>
+                  );
+                })}
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+          )}
+        </>
+      )}
     </div>
   );
-}
-
-// ── Build insights from real data ──
-function buildInsights(overview, quality, categories, kbEffectiveness) {
-  const insights = [];
-  const totalSessions = overview.total_sessions || 0;
-  const totalTickets = overview.total_tickets || 0;
-  const completionRate = quality.completion_rate || 0;
-  const aiRate = kbEffectiveness.ai_resolution_rate || 0;
-
-  if (totalSessions > 0) {
-    const escalationRate = Math.round((totalTickets / totalSessions) * 100);
-    if (escalationRate > 60) {
-      insights.push({
-        type: 'warning', icon: '⚠️',
-        title: 'Tingkat Eskalasi Tinggi',
-        desc: `${escalationRate}% percakapan berakhir dengan tiket. Tambahkan solusi di Knowledge Base untuk mengurangi eskalasi.`,
-      });
-    } else if (escalationRate <= 30 && totalSessions >= 5) {
-      insights.push({
-        type: 'success', icon: '✅',
-        title: 'Chatbot Bekerja Efektif',
-        desc: `Hanya ${escalationRate}% percakapan diteruskan ke support. AI berhasil menangani mayoritas masalah.`,
-      });
-    }
-  }
-
-  if (completionRate > 0 && completionRate < 70) {
-    insights.push({
-      type: 'warning', icon: '📉',
-      title: 'Tingkat Penyelesaian Perlu Ditingkatkan',
-      desc: `Hanya ${completionRate}% sesi yang berhasil diselesaikan. Periksa alur percakapan chatbot.`,
-    });
-  }
-
-  if (categories.length > 0) {
-    const topCat = categories.reduce((a, b) => a.count > b.count ? a : b);
-    insights.push({
-      type: 'info', icon: '📋',
-      title: `Masalah Terbanyak: ${topCat.name}`,
-      desc: `Kategori "${topCat.name}" mendominasi dengan ${topCat.count} laporan. Fokuskan KB pada area ini.`,
-    });
-  }
-
-  if (totalSessions === 0) {
-    insights.push({
-      type: 'info', icon: '📊',
-      title: 'Mulai Mengumpulkan Data',
-      desc: 'Belum ada percakapan tercatat. Begitu ada pengguna menghubungi chatbot, data akan muncul otomatis.',
-    });
-  }
-
-  return insights;
-}
-
-// ── Helpers ──
-function getCompStatusType(status) {
-  if (!status || status === 'unknown') return 'unknown';
-  if (status === 'connected' || status === 'operational' || status === 'configured' || status.startsWith('loaded') || status.startsWith('rag_')) return 'ok';
-  if (status === 'not_configured') return 'off';
-  if (status.startsWith('error') || status === 'unreachable') return 'error';
-  return 'unknown';
-}
-
-function getCompStatusLabel(status) {
-  if (!status || status === 'unknown') return 'Tidak Diketahui';
-  if (status === 'connected') return 'Terhubung';
-  if (status === 'operational') return 'Aktif';
-  if (status === 'configured') return 'Dikonfigurasi';
-  if (status === 'not_configured') return 'Belum Dikonfigurasi';
-  if (status === 'unreachable') return 'Tidak Terjangkau';
-  if (status.startsWith('loaded')) return 'Aktif';
-  if (status.startsWith('rag_')) return status.includes('pgvector_true') ? 'RAG + pgvector Aktif' : 'RAG Aktif';
-  if (status.startsWith('error')) return 'Error';
-  return status;
-}
-
-function getRecTypeLabel(type) {
-  const labels = {
-    'kb_gap': 'Knowledge Base',
-    'staffing': 'Jadwal Tim',
-    'volume_alert': 'Volume',
-    'improvement': 'Peningkatan',
-    'kb_improvement': 'Knowledge Base',
-  };
-  return labels[type] || type;
-}
-
-function formatTimeAgo(timestamp) {
-  const now = new Date();
-  const then = new Date(timestamp);
-  const diffMs = now - then;
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffMin < 1) return 'Baru saja';
-  if (diffMin < 60) return `${diffMin} menit lalu`;
-  if (diffHour < 24) return `${diffHour} jam lalu`;
-  if (diffDay < 7) return `${diffDay} hari lalu`;
-  return then.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }

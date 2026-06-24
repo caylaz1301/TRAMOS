@@ -30,4 +30,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9999/health', timeout=5).read()"
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-9999} --workers ${UVICORN_WORKERS:-2}"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-9999} --workers ${UVICORN_WORKERS:-1}"]

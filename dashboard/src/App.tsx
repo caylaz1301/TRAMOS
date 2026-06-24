@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Login from './Login';
 import Layout from './components/Layout';
 import OverviewPage from './pages/OverviewPage';
@@ -6,6 +6,7 @@ import PerformancePage from './pages/PerformancePage';
 import InsightsPage from './pages/InsightsPage';
 
 type PageId = 'overview' | 'performance' | 'insights';
+type UserRole = 'admin' | 'user' | 'operator' | 'analyst';
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -50,7 +51,7 @@ export default function App() {
   }
 
   const userName = localStorage.getItem('user_name') || 'User';
-  const userRole = localStorage.getItem('user_role') || 'user';
+  const userRole = (localStorage.getItem('user_role') || 'user') as UserRole;
 
   const renderPage = () => {
     switch (currentPage) {
@@ -70,7 +71,7 @@ export default function App() {
         currentPage={currentPage}
         onNavigate={setCurrentPage}
         username={userName}
-        userRole={userRole as 'admin' | 'user' | 'operator' | 'analyst'}
+        userRole={userRole}
         onLogout={handleLogoutRequest}
       >
         {renderPage()}
@@ -79,9 +80,18 @@ export default function App() {
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div className="logout-overlay" onClick={handleLogoutCancel}>
-          <div className="logout-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="logout-modal" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <div className="logout-modal-icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -90,8 +100,12 @@ export default function App() {
             <h3 className="logout-modal-title">Keluar dari Dashboard?</h3>
             <p className="logout-modal-text">Kamu akan perlu login kembali untuk mengakses dashboard.</p>
             <div className="logout-modal-actions">
-              <button className="btn-logout-cancel" onClick={handleLogoutCancel}>Batal</button>
-              <button className="btn-logout-confirm" onClick={handleLogoutConfirm}>Ya, Keluar</button>
+              <button className="btn-logout-cancel" onClick={handleLogoutCancel}>
+                Batal
+              </button>
+              <button className="btn-logout-confirm" onClick={handleLogoutConfirm}>
+                Ya, Keluar
+              </button>
             </div>
           </div>
         </div>

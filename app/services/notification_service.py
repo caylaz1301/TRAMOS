@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class EmailNotificationService:
     """Service for sending email notifications to operators"""
-    
+
     def __init__(self):
         """Initialize email service from configuration"""
         self.smtp_server = settings.SMTP_SERVER
@@ -25,26 +25,47 @@ class EmailNotificationService:
         self.smtp_password = settings.SMTP_PASSWORD
         self.from_email = settings.SMTP_FROM_EMAIL
         self.operator_emails = settings.OPERATOR_EMAILS
+
+        # Debug logging for troubleshooting
+        logger.info(f"📧 Email Config: SMTP_SERVER={self.smtp_server}, SMTP_PORT={self.smtp_port}")
+        logger.info(f"📧 Email Config: SMTP_USERNAME={'SET' if self.smtp_username else 'NOT SET'}")
+        logger.info(f"📧 Email Config: SMTP_PASSWORD={'SET' if self.smtp_password else 'NOT SET'}")
+        logger.info(f"📧 Email Config: SMTP_FROM_EMAIL={self.from_email}")
+        logger.info(f"📧 Email Config: OPERATOR_EMAILS={self.operator_emails}")
+
         self.enabled = self._verify_config()
-    
+
     def _verify_config(self) -> bool:
         """Verify email configuration is complete"""
-        required_fields = [
-            self.smtp_server,
-            self.smtp_port,
-            self.smtp_username,
-            self.smtp_password,
-            self.from_email,
-        ]
-        
-        is_valid = all(required_fields)
-        
-        if not is_valid:
-            logger.warning("⚠️ Email notification service not fully configured. Required fields: SMTP_SERVER, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL")
-        elif not self.operator_emails:
-            logger.warning("⚠️ No operator emails configured. Set OPERATOR_EMAILS in .env")
-        
-        return is_valid
+        required_fields = {
+            "SMTP_SERVER": self.smtp_server,
+            "SMTP_PORT": self.smtp_port,
+            "SMTP_USERNAME": self.smtp_username,
+            "SMTP_PASSWORD": self.smtp_password,
+            "SMTP_FROM_EMAIL": self.from_email,
+        }
+
+        missing_fields = [name for name, value in required_fields.items() if not value]
+
+        if missing_fields:
+            logger.warning(
+                f"⚠️ Email notification service not fully configured. "
+                f"Missing: {', '.join(missing_fields)}"
+            )
+            return False
+
+        if not self.operator_emails:
+            logger.warning(
+                "⚠️ No operator emails configured. "
+                "Set OPERATOR_EMAILS in .env (e.g., OPERATOR_EMAILS=op1@mail.com,op2@mail.com)"
+            )
+            return False
+
+        logger.info(
+            f"✅ Email notification service ready. "
+            f"Will notify {len(self.operator_emails)} operator(s)"
+        )
+        return True
     
     def send_new_ticket_notification(self, ticket_data: dict) -> bool:
         """
@@ -271,13 +292,13 @@ class EmailNotificationService:
     def _send_email(self, to_emails: List[str], subject: str, html_body: str, text_body: str) -> bool:
         """
         Send email using SMTP
-        
+
         Args:
             to_emails: List of recipient email addresses
             subject: Email subject
             html_body: HTML email body
             text_body: Plain text email body
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -287,31 +308,46 @@ class EmailNotificationService:
             msg['Subject'] = subject
             msg['From'] = self.from_email
             msg['To'] = ', '.join(to_emails)
-            
+
             # Attach both plain text and HTML (most clients will prefer HTML)
             msg.attach(MIMEText(text_body, 'plain'))
             msg.attach(MIMEText(html_body, 'html'))
-            
+
+            logger.info(f"📧 Connecting to {self.smtp_server}:{self.smtp_port}...")
+
             # Send email
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 # Use TLS if configured
                 if settings.SMTP_USE_TLS:
                     server.starttls()
-                
+                    logger.debug("TLS started successfully")
+
                 # Login if credentials provided
                 if self.smtp_username and self.smtp_password:
                     server.login(self.smtp_username, self.smtp_password)
-                
+                    logger.debug("SMTP login successful")
+
                 # Send message
                 server.sendmail(self.from_email, to_emails, msg.as_string())
-            
+                logger.info(f"✅ Email sent to {len(to_emails)} recipient(s): {to_emails}")
+
             return True
-        
+
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"❌ SMTP Auth failed: {e}")
+            logger.error("💡 Tip: For Gmail, use App Password instead of regular password (enable 2FA first)")
+            return False
+        except smtplib.SMTPServerDisconnected as e:
+            logger.error(f"❌ SMTP server disconnected: {e}")
+            return False
+        except smtplib.SMTPRecipientsRefused as e:
+            logger.error(f"❌ Recipient refused: {e}")
+            return False
         except smtplib.SMTPException as e:
-            logger.error(f"❌ SMTP error: {str(e)}")
+            logger.error(f"❌ SMTP error: {e}")
             return False
         except Exception as e:
-            logger.error(f"❌ Unexpected error sending email: {str(e)}")
+            logger.error(f"❌ Unexpected error sending email: {e}")
             return False
 
 

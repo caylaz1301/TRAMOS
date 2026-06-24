@@ -476,6 +476,8 @@ class WhatsAppSession(Base):
     # Conversation Metadata
     message_count = Column(Integer, default=0)
     conversation_history = Column(JSON, default=[])  # Full conversation log
+    # Context tambahan untuk menjaga kesinambungan flow setelah restart/worker switch.
+    context_data = Column(JSON, default={})
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -514,6 +516,7 @@ class WhatsAppSession(Base):
             "osticket_id": self.osticket_id,
             "message_count": self.message_count,
             "conversation_history": self.conversation_history,
+            "context_data": self.context_data or {},
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
         }
@@ -1113,6 +1116,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_sessions (
     osticket_id INTEGER,
     message_count INTEGER DEFAULT 0,
     conversation_history JSONB DEFAULT '[]',
+    context_data JSONB DEFAULT '{}',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
     last_activity TIMESTAMP DEFAULT NOW(),

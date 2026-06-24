@@ -316,7 +316,26 @@ Be strict: only return one of the listed categories. If no match, set best_match
     def format_solution_for_user(self, solution: Dict[str, Any], user_context: Optional[Dict[str, Any]] = None) -> str:
         """Format solution for WhatsApp - compact and clear (without feedback question)"""
         if solution.get("rag_answer"):
-            return solution["rag_answer"]
+            # Clean KB content - remove internal notes that shouldn't be shown to users
+            answer = solution["rag_answer"]
+
+            # Remove section numbers like "## 8. " or "## 12. "
+            import re
+            answer = re.sub(r'## \d+\.\s*', '## ', answer)
+
+            # Remove "Contoh jawaban:" sections (everything from "Contoh jawaban:" to the next newline or paragraph)
+            answer = re.sub(r'Contoh jawaban:\s*\n".*?"\s*', '\n', answer, flags=re.DOTALL)
+
+            # Remove standalone "Contoh jawaban:" lines
+            answer = re.sub(r'Contoh jawaban:\s*\n?', '', answer)
+
+            # Remove "Jawaban aman:" example responses
+            answer = re.sub(r'Jawaban aman:\s*\n".*?"\s*', '\n', answer, flags=re.DOTALL)
+
+            # Clean up multiple blank lines
+            answer = re.sub(r'\n{3,}', '\n\n', answer)
+
+            return answer.strip()
 
         category = solution.get("category", "app")
         confidence = solution.get("confidence", 0.5)

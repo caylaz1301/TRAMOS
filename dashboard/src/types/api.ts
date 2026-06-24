@@ -1,4 +1,5 @@
 // API Response Types for TRAMOS Dashboard
+// These types match the backend analytics.py definitions
 
 // Auth Types
 export interface AuthUser {
@@ -17,59 +18,73 @@ export interface AuthResponse {
 }
 
 // Analytics Types
+// Overview Stats - calculated from WhatsAppSession table
 export interface OverviewStats {
-  total_sessions: number;
-  total_tickets: number;
-  total_messages: number;
-  success_rate: number;
-  avg_messages_per_session: number;
-  active_sessions: number;
-  ai_resolved_sessions?: number;
+  total_sessions: number;           // All sessions in date range
+  total_tickets: number;            // Sessions with ticket_id IS NOT NULL
+  total_messages: number;            // Sum of message_count
+  success_rate: number;             // (ai_resolved_sessions / total_sessions) * 100
+  avg_messages_per_session: number;  // total_messages / total_sessions
+  active_sessions: number;          // Sessions where last_activity >= 5 min ago AND is_active == True
+  ai_resolved_sessions: number;     // Sessions where ticket_id IS NULL AND current_state IN ("resolved", "closed")
 }
 
+// Category distribution of detected problems
 export interface CategoryStats {
   name: string;
   count: number;
 }
 
+// Severity/urgency distribution
 export interface SeverityStats {
   name: 'critical' | 'high' | 'medium' | 'normal' | 'low';
   count: number;
 }
 
+// Quality metrics from session analysis
 export interface QualityMetrics {
-  completion_rate: number;
-  avg_duration_seconds: number;
-  avg_messages: number;
-  abandoned_sessions: number;
+  completion_rate: number;              // Percentage of completed sessions
+  avg_duration_seconds: number;         // Average session duration
+  avg_messages: number;                 // Average messages per session
+  abandoned_sessions: number;           // current_state != "closed" AND is_active == False
   total_sessions: number;
-  completed_sessions?: number;
+  completed_sessions?: number;           // Sessions that reached completion
 }
 
+// Ticket statistics
 export interface TicketStats {
   total_tickets: number;
   by_category?: Array<{ category: string; count: number }>;
 }
 
+// Timeline point - hourly data from backend
+// Note: Backend returns HOURLY data, frontend should aggregate to daily
 export interface TimelinePoint {
+  timestamp?: string;    // ISO datetime string like "2026-06-17 10:00:00"
   date?: string;
-  timestamp?: string;
   hour?: string;
   sessions: number;
-  tickets: number;
+  tickets?: number;
+  count?: number;       // Alternative field name
 }
 
+// Recent session record
 export interface RecentSession {
+  id?: number;
   name: string;
   phone: string;
   problem?: string;
   category?: string;
-  state: string;
-  messages: number;
+  state: string;        // Bot state machine state
+  messages?: number;     // Message count
+  message_count?: number;
   created_at: string;
+  last_activity?: string;
+  ticket_id?: number | null;
+  is_active?: boolean;
 }
 
-// Dashboard Response
+// Dashboard Response - combined data from all analytics endpoints
 export interface DashboardResponse {
   overview: OverviewStats;
   categories: { categories: CategoryStats[] };
@@ -80,18 +95,26 @@ export interface DashboardResponse {
   timeline?: { timeline: TimelinePoint[] };
 }
 
-// Performance Types
+// Performance Report from ML analysis
 export interface PerformanceResponse {
   performance_score: number;
   score_grade: string;
   action_items: string[];
+  summary?: {
+    total_sessions: number;
+    resolved_by_ai: number;
+    escalated: number;
+    avg_resolution_time: number;
+  };
 }
 
+// Benchmark score response
 export interface BenchmarkResponse {
   score?: number;
   industry_avg?: number;
   resolution_rate?: number;
   escalation_rate?: number;
+  generated_at?: string;
 }
 
 // ML Insights Types
@@ -126,6 +149,7 @@ export interface Alert {
   description?: string;
   detail?: string;
   severity: 'critical' | 'warning' | 'info';
+  timestamp?: string;
 }
 
 export interface AlertsResponse {
@@ -150,10 +174,11 @@ export interface HealthCheckResponse {
 // Activity Log
 export interface ActivityEvent {
   type: string;
-  icon: string;
+  icon?: string;
   description: string;
   timestamp: string;
   severity?: string;
+  category?: string;
 }
 
 export interface ActivityLogResponse {

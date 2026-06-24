@@ -296,7 +296,8 @@ async def get_recent_sessions(limit: int = 10, start_date: str = None, end_date:
                     "ticket_id": s.ticket_id,
                     "messages": s.message_count,
                     "state": s.current_state,
-                    "created_at": s.created_at.isoformat() if s.created_at else None
+                    # Convert to UTC ISO format - always include Z to indicate UTC
+                    "created_at": (s.created_at.isoformat() + "Z") if s.created_at else None
                 }
                 for s in sessions
             ]
@@ -1091,7 +1092,8 @@ async def get_activity_log(limit: int = 20, db: Session = Depends(get_db)):
                 "type": event_type,
                 "icon": event_icon,
                 "description": event_desc,
-                "timestamp": s.last_activity.isoformat() if s.last_activity else s.created_at.isoformat() if s.created_at else None,
+                # Convert to UTC ISO format - always include Z to indicate UTC
+                "timestamp": (s.last_activity.isoformat() + "Z") if s.last_activity else ((s.created_at.isoformat() + "Z") if s.created_at else None),
                 "phone": s.phone_number,
                 "category": s.problem_category,
                 "severity": s.problem_severity,

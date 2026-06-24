@@ -84,12 +84,20 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: var(--text-muted);
 }
 
-.kpi-blue .kpi-icon-wrap   { background: var(--accent-muted); color: var(--accent); }
-.kpi-emerald .kpi-icon-wrap { background: var(--emerald-muted); color: var(--emerald); }
-.kpi-amber .kpi-icon-wrap   { background: var(--amber-muted); color: var(--amber); }
-.kpi-violet .kpi-icon-wrap  { background: var(--violet-muted); color: var(--violet); }
+.kpi-icon-wrap svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+}
+
+.kpi-blue .kpi-icon-wrap   { background: var(--accent-muted); }
+.kpi-emerald .kpi-icon-wrap { background: var(--emerald-muted); }
+.kpi-amber .kpi-icon-wrap   { background: var(--amber-muted); }
+.kpi-violet .kpi-icon-wrap  { background: var(--violet-muted); }
 
 .kpi-body {
   min-width: 0;
@@ -363,6 +371,17 @@
 .tag-status-warning { background: var(--amber-muted); color: var(--amber); }
 .tag-status-info    { background: var(--accent-muted); color: var(--accent); }
 .tag-status-default { background: var(--bg-surface); color: var(--text-muted); }
+
+/* ── Chart Summary ── */
+.chart-summary {
+  padding: 8px 20px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chart-summary strong {
+  color: var(--text-primary);
+}
 
 /* ── Responsive ── */
 @media (max-width: 1200px) {

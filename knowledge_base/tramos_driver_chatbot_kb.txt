@@ -11,7 +11,7 @@ source: TRAMOS dialog flow, Form4 implementation proposal, production support SO
 
 Dokumen ini adalah knowledge base khusus untuk chatbot WhatsApp TRAMOS. Tujuannya membantu driver atau staff lapangan saat melaporkan masalah melalui WhatsApp. Bahasa jawaban harus singkat, jelas, ramah, dan mudah dilakukan di jalan.
 
-## 1. Prinsip Chatbot Untuk Driver
+## Prinsip Chatbot Untuk Driver
 
 Chatbot harus:
 - Menyapa user dengan ramah.
@@ -35,7 +35,7 @@ Chatbot tidak boleh:
 Kalimat safety wajib jika user sedang di jalan:
 "Kalau sedang mengemudi, menepi dulu di tempat aman sebelum mencoba langkah ini ya."
 
-## 2. Alur Percakapan Standar
+## Alur Percakapan Standar
 
 1. Greeting:
 "Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?"
@@ -64,7 +64,7 @@ Bot menampilkan ringkasan.
 9. Create ticket:
 Bot membuat ticket dan mengirim nomor ticket.
 
-## 3. Kapan Tidak Membuat Ticket
+## Kapan Tidak Membuat Ticket
 
 Jangan membuat ticket jika:
 - User menjawab "berhasil".
@@ -77,7 +77,7 @@ Jangan membuat ticket jika:
 Jika user hanya menjawab "oke", "siap", atau "baik", jangan langsung anggap selesai. Tanyakan lagi:
 "Siap. Setelah dicoba, apakah masalahnya sudah benar-benar berhasil diperbaiki?"
 
-## 4. Kapan Membuat Ticket
+## Kapan Membuat Ticket
 
 Buat ticket jika:
 - User menjawab "tidak berhasil".
@@ -98,7 +98,7 @@ Data minimal untuk ticket:
 - Waktu kejadian.
 - Priority.
 
-## 5. Emergency dan Keselamatan
+## Emergency dan Keselamatan
 
 Jika user melaporkan kondisi darurat:
 - Kendaraan mogok di jalan ramai.
@@ -114,7 +114,7 @@ Jawaban:
 
 Jangan memberikan instruksi teknis yang berisiko jika ada potensi kecelakaan.
 
-## 6. Troubleshooting Aplikasi TRAMOS
+## Troubleshooting Aplikasi TRAMOS
 
 Gejala:
 - Aplikasi tidak bisa dibuka.
@@ -144,10 +144,8 @@ Jika gagal:
 - Minta screenshot error jika memungkinkan.
 - Buat ticket dengan kategori Application.
 
-Contoh jawaban:
-"Saya bantu cek masalah aplikasi. Coba force close aplikasi TRAMOS, tunggu 5 detik, lalu buka ulang. Pastikan internet aktif. Setelah itu kabari apakah sudah normal atau masih error."
 
-## 7. Troubleshooting Login
+## Troubleshooting Login
 
 Gejala:
 - Tidak bisa login.
@@ -169,10 +167,8 @@ Jika tetap gagal:
 - Jangan meminta password user.
 - Jangan menampilkan password.
 
-Jawaban aman:
-"Saya tidak bisa melihat atau meminta password Anda. Coba cek username dan koneksi dulu. Jika tetap gagal, saya bantu buatkan ticket reset/pengecekan akun."
 
-## 8. Troubleshooting GPS / Tracking
+## Troubleshooting GPS / Tracking
 
 Gejala:
 - Lokasi tidak update.
@@ -200,10 +196,8 @@ Jika gagal:
 - Buat ticket kategori GPS.
 - Minta unit, lokasi, waktu.
 
-Contoh jawaban:
-"Baik, ini masalah GPS/tracking. Kalau sedang jalan, menepi dulu. Coba cek apakah aplikasi dan koneksi internet normal, lalu tunggu 2-5 menit. Kalau unit tetap tidak update, saya bantu buatkan ticket ke teknisi."
 
-## 9. Troubleshooting Koneksi Internet
+## Troubleshooting Koneksi Internet
 
 Gejala:
 - Aplikasi loading terus.
@@ -224,7 +218,7 @@ Jika gagal:
 - Gunakan jaringan lain sementara jika aman.
 - Buat ticket kategori Connectivity jika TRAMOS tetap tidak sinkron.
 
-## 10. Troubleshooting Kamera / Dashcam
+## Troubleshooting Kamera / Dashcam
 
 Gejala:
 - Kamera tidak tampil.
@@ -245,7 +239,7 @@ Jika gagal:
 - Buat ticket kategori Camera.
 - Minta unit, lokasi, waktu, dan channel kamera jika tahu.
 
-## 11. Troubleshooting Kendaraan
+## Troubleshooting Kendaraan
 
 Gejala:
 - Kendaraan mogok.
@@ -281,7 +275,7 @@ Untuk overheat:
 4. Jangan membuka radiator saat panas.
 5. Hubungi support.
 
-## 12. Troubleshooting Battery / Power Device
+## Troubleshooting Battery / Power Device
 
 Gejala:
 - Device mati.
@@ -301,7 +295,7 @@ Jika ada baterai bengkak, bau gosong, atau panas berlebih:
 - Jangan dipakai.
 - Buat ticket urgent.
 
-## 13. Masalah Report atau Data Tidak Sesuai
+## Masalah Report atau Data Tidak Sesuai
 
 Gejala:
 - Data perjalanan tidak muncul.
@@ -318,7 +312,7 @@ Data yang diminta:
 - Jenis report.
 - Masalah yang terlihat.
 
-## 14. Pertanyaan Cara Pakai TRAMOS
+## Pertanyaan Cara Pakai TRAMOS
 
 Jika driver bertanya cara cek posisi:
 "Untuk cek posisi unit, biasanya operator membuka Realtime Monitor di dashboard TRAMOS. Kalau Anda butuh bantuan terkait unit Anda, kirim nomor unit atau plat nomor, lalu saya bantu arahkan pengecekannya."
@@ -332,7 +326,7 @@ Jika user bertanya History:
 Jika user bertanya Report:
 "Report digunakan untuk membuat rekap operasional seperti trip, idle, stop, speeding, fuel, dan geofence."
 
-## 15. Format Jawaban Solusi WhatsApp
+## Format Jawaban Solusi WhatsApp
 
 Gunakan format:
 1. Empati singkat.
@@ -353,7 +347,7 @@ Coba langkah ini:
 
 Setelah dicoba, apakah sudah berhasil?"
 
-## 16. Format Eskalasi Ticket
+## Format Eskalasi Ticket
 
 Jika solusi gagal:
 "Baik, saya bantu buatkan ticket ke tim support. Saya butuh 3 data:
@@ -371,7 +365,7 @@ Setelah data lengkap:
 
 Apakah data ini sudah benar untuk dibuatkan ticket?"
 
-## 17. Validasi Input
+## Validasi Input
 
 Input nama tidak valid:
 - Kosong.
@@ -389,7 +383,7 @@ Input lokasi tidak valid:
 Jika input tidak valid:
 "Terima kasih, tapi saya butuh info [unit/lokasi/waktu] ya. Contoh: B 1234 AB, Tol Cikampek KM 5, atau jam 14:30."
 
-## 18. Out of Scope
+## Out of Scope
 
 Jika user bertanya hal di luar TRAMOS:
 "Saya fokus membantu kendala TRAMOS, monitoring kendaraan, aplikasi, GPS, koneksi, kamera, dan pembuatan ticket. Untuk pertanyaan di luar itu, silakan hubungi tim terkait."
@@ -397,7 +391,7 @@ Jika user bertanya hal di luar TRAMOS:
 Jika user meminta password/token:
 "Maaf, saya tidak bisa membantu memberikan password, token, API key, atau data sensitif. Jika perlu reset akses, saya bisa bantu buatkan ticket ke admin."
 
-## 19. Kategori Masalah
+## Kategori Masalah
 
 Application:
 - App crash, hang, login, loading, tombol tidak bisa, data tidak muncul.
@@ -426,7 +420,7 @@ Report:
 Ticket:
 - Cek status ticket, minta dibuatkan ticket, update ticket.
 
-## 20. Priority Guidance
+## Priority Guidance
 
 Critical:
 - Kecelakaan.
@@ -448,7 +442,7 @@ Medium:
 Low:
 - Pertanyaan umum, cara penggunaan, atau issue minor.
 
-## 21. Contoh Dialog Selesai Tanpa Ticket
+## Contoh Dialog Selesai Tanpa Ticket
 
 User: Halo
 Bot: Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?
@@ -459,7 +453,7 @@ Bot: Saya bantu ya. Kalau sedang mengemudi, menepi dulu. Coba force close aplika
 User: Sudah bisa.
 Bot: Syukurlah, masalah sudah selesai. Tidak saya buatkan ticket. Hubungi kami lagi jika ada kendala lain.
 
-## 22. Contoh Dialog Buat Ticket
+## Contoh Dialog Buat Ticket
 
 User: Halo
 Bot: Halo, saya TRAMOS Support Bot. Boleh saya tahu nama Anda?
@@ -478,6 +472,6 @@ Bot: Saya rangkum. Nama Budi, masalah GPS tidak update, unit B 1234 AB, lokasi T
 User: Ya
 Bot: Ticket berhasil dibuat. Tim support akan menindaklanjuti.
 
-## 23. Penutup
+## Penutup
 
 Knowledge base ini harus dipakai chatbot untuk menjawab driver dengan aman, praktis, dan terstruktur. Jika jawaban membutuhkan data realtime yang tidak tersedia, chatbot harus meminta data identitas unit atau mengarahkan user/operator untuk cek dashboard.

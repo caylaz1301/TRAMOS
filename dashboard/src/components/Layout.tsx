@@ -2,20 +2,50 @@ import React, { useState, useEffect } from 'react';
 import './Layout.css';
 
 const NAV_ITEMS = [
-  { id: 'overview',    label: 'Ringkasan',          icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { id: 'performance', label: 'Performa AI',        icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { id: 'insights',    label: 'Laporan & Notifikasi', icon: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z' },
+  {
+    id: 'overview',
+    label: 'Ringkasan',
+    icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+  },
+  {
+    id: 'performance',
+    label: 'Performa AI',
+    icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+  },
+  {
+    id: 'insights',
+    label: 'Laporan',
+    icon: 'M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  },
 ];
 
-function NavIcon({ path }) {
+function NavIcon({ path }: { path: string }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d={path} />
     </svg>
   );
 }
 
-export default function Layout({ currentPage, onNavigate, username, userRole, onLogout, children }) {
+interface LayoutProps {
+  currentPage: string;
+  onNavigate: (page: string) => void;
+  username?: string;
+  userRole?: string;
+  onLogout: () => void;
+  children: React.ReactNode;
+}
+
+export default function Layout({ currentPage, onNavigate, username, userRole, onLogout, children }: LayoutProps) {
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('theme');
     return saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -26,9 +56,8 @@ export default function Layout({ currentPage, onNavigate, username, userRole, on
     user: 'User',
     operator: 'Operator',
     analyst: 'Analyst',
-  }[userRole] || 'User';
+  }[userRole || ''] || 'User';
 
-  // Apply theme to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
@@ -67,7 +96,9 @@ export default function Layout({ currentPage, onNavigate, username, userRole, on
               className={`nav-item ${currentPage === item.id ? 'active' : ''}`}
               onClick={() => onNavigate(item.id)}
             >
-              <span className="nav-icon"><NavIcon path={item.icon} /></span>
+              <span className="nav-icon">
+                <NavIcon path={item.icon} />
+              </span>
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
@@ -82,7 +113,16 @@ export default function Layout({ currentPage, onNavigate, username, userRole, on
             title={isDark ? 'Mode Terang' : 'Mode Gelap'}
           >
             {isDark ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />
                 <line x1="12" y1="21" x2="12" y2="23" />
@@ -94,23 +134,39 @@ export default function Layout({ currentPage, onNavigate, username, userRole, on
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
               </svg>
             )}
           </button>
 
           <div className="user-section">
-            <div className="user-avatar">
-              {(username || 'U').charAt(0).toUpperCase()}
-            </div>
+            <div className="user-avatar">{(username || 'U').charAt(0).toUpperCase()}</div>
             <div className="user-details">
               <span className="user-name">{username || 'User'}</span>
               <span className="user-role">{displayRole}</span>
             </div>
           </div>
           <button className="btn-logout" onClick={onLogout} title="Keluar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
@@ -119,9 +175,7 @@ export default function Layout({ currentPage, onNavigate, username, userRole, on
         </div>
       </aside>
 
-      <main className="main-content">
-        {children}
-      </main>
+      <main className="main-content">{children}</main>
     </div>
   );
 }

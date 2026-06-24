@@ -1,0 +1,18 @@
+{
+  "name": "TRAMOS Dashboard",
+  "short_name": "TRAMOS",
+  "description": "AI-powered WhatsApp support dashboard untuk fleet management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='192' height='192' viewBox='0 0 192 192'><rect width='192' height='192' rx='24' fill='%232563eb'/><g transform='translate(48,48)'><rect width='96' height='96' rx='12' fill='white' fill-opacity='0.2'/><path d='M24 64V52l24-14 24 14 24-14 24 14z' fill='white'/></g></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "id"
+}

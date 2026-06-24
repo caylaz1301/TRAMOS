@@ -174,7 +174,7 @@ class SmartDialogFlowHandler:
     def blame_without_evidence_response() -> str:
         """Jawaban aman untuk kasus investigasi yang belum punya bukti lengkap."""
         return smart_response_system.format_for_whatsapp(
-            "Saya tidak bisa langsung menyatakan driver bersalah tanpa data lengkap.\n\n"
+            "Maaf, saya tidak bisa langsung menyatakan driver bersalah tanpa data yang lengkap.\n\n"
             "Untuk investigasi overspeed, operator perlu cek dulu:\n"
             "• Unit atau nomor polisi\n"
             "• Tanggal dan waktu kejadian\n"
@@ -340,7 +340,10 @@ class SmartDialogFlowHandler:
         
         elif session.current_state == DialogState.COLLECTING_TIME:
             return SmartDialogFlowHandler._handle_time_input(session, user_message)
-        
+
+        elif session.current_state == DialogState.COLLECTING_CORRECTION:
+            return SmartDialogFlowHandler._handle_correction_input(session, user_message)
+
         elif session.current_state == DialogState.CONFIRMING_DETAILS:
             return SmartDialogFlowHandler._handle_confirmation(session, user_message)
         
@@ -394,14 +397,12 @@ class SmartDialogFlowHandler:
             session.driver_name = name
             logger.info(f"✓ Name collected: {name}")
             
-            # Ask for problem with clear options
-            prompt = f"Terima kasih {name}! 😊\n\n"
-            prompt += smart_response_system.format_question(
-                "Ceritakan masalah yang Anda alami",
-                options=["GPS tidak berfungsi", "Kamera error", "Baterai cepat habis", "Masalah koneksi"]
+            # Langsung minta cerita masalah tanpa menu nomor
+            prompt = smart_response_system.problem_prompt(
+                f"Terima kasih {name}! 😊"
             )
-            
-            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_PROBLEM)
+
+            return (prompt, DialogState.COLLECTING_PROBLEM)
         
         except Exception as e:
             logger.error(f"Error in name handling: {e}")
@@ -436,31 +437,88 @@ class SmartDialogFlowHandler:
         # Search KB
         return (smart_response_system.format_for_whatsapp(acknowledge_msg), DialogState.SEARCHING_KB_SOLUTION)
     
+        # Fallback troubleshooting steps per kategori — selalu tersedia, bahkan tanpa KB articles.
+    # Ini dipakai ketika RAG/Gemini/keyword KB tidak menemukan solusi spesifik.
+    KB_CATEGORY_FALLBACK_STEPS = {
+        "camera": [
+            ("Cek fisik kamera", "Bersihkan lensa dengan kain lembut. Pastikan tidak ada debu atau air. Cek kabel power terpasang."),
+            ("Restart kamera", "Cabut power 30 detik, pasang lagi. Tunggu sampai LED indikator normal."),
+            ("Cek storage", "Pastikan storage tidak penuh. Minimal 10% free untuk recording baru."),
+        ],
+        "device": [
+            ("Restart perangkat", "Matikan sepenuhnya, tunggu 30 detik, nyalakan lagi. Tunggu fully boot."),
+            ("Cek daya/charger", "Pastikan baterai cukup atau charger terhubung. Cek port power tidak longgar."),
+            ("Force close app", "Tutup paksa app TRAMOS, buka lagi. Jika masih hang, restart perangkat."),
+        ],
+        "gps": [
+            ("Cek posisi", "Pastikan perangkat di area terbuka. GPS tidak bisa di dalam gedung/tebal."),
+            ("Restart GPS", "Matikan GPS, tunggu 1 menit, nyalakan. Tunggu 2-5 menit sampai lokasi update."),
+            ("Cek data seluler", "GPS butuh internet untuk kirim data. Pastikan sinyal data aktif."),
+        ],
+        "connectivity": [
+            ("Cek sinyal", "Pastikan sinyal seluler/wifi cukup. Coba hidup-matikan airplane mode."),
+            ("Restart modem", "Matikan modem/router 30 detik, nyalakan lagi."),
+            ("Cek paket data", "Pastikan paket internet masih aktif dan cukup quota."),
+        ],
+        "app": [
+            ("Force close app", "Tutup paksa app TRAMOS, buka lagi."),
+            ("Logout dan login ulang", "Logout, tunggu 10 detik, login lagi."),
+            ("Cek update", "Pastikan app TRAMOS versi terbaru. Cek Play Store/App Store."),
+        ],
+        "battery": [
+            ("Cek charger", "Pastikan charger dan kabel tidak rusak. Coba charger lain."),
+            ("Cek aplikasi background", "Tutup app yang tidak perlu untuk hemat baterai."),
+            ("Restart perangkat", "Restart perangkat untuk reset sistem daya."),
+        ],
+        "sensor": [
+            ("Cek fisik sensor", "Pastikan sensor tidak tertutup debu, kotoran, atau air."),
+            ("Restart perangkat", "Restart perangkat untuk reset sensor."),
+        ],
+        "vehicle": [
+            ("Cek mesin", "Pastikan mesin dalam kondisi siap. Cek indikator dashboard."),
+            ("Restart sistem", "Matikan mesin, tunggu 1 menit, nyalakan lagi."),
+        ],
+    }
+    # Default steps jika kategori tidak ada di atas
+    KB_GENERIC_FALLBACK_STEPS = [
+        ("Cek kondisi perangkat", "Pastikan perangkat menyala dan tidak ada indikator error."),
+        ("Restart perangkat", "Matikan perangkat, tunggu 30 detik, nyalakan kembali."),
+        ("Hubungi tim support", "Jika masih bermasalah, tim teknisi akan bantu lebih lanjut."),
+    ]
+
     @staticmethod
-    def _search_kb_smart(session: ConversationSession) -> Tuple[str, DialogState]:
-        """Smart KB search + solution presentation - custom steps based on actual problem"""
+    def _search_kb_smart(session: ConversationSession, acknowledge_prefix: str = None) -> Tuple[str, DialogState]:
+        """Smart KB search + solution presentation.
+        Jika KB tidak nemu solusi spesifik, tetap kasih troubleshooting steps
+        berdasarkan kategori masalah, lalu minta feedback."""
         solutions = solution_searcher.search_solutions(
             session.problem_description,
             session.problem_category
         )
-        
+
         if not solutions:
-            logger.warning("No KB solution found")
-            # No solution found - escalate with clear hardcoded message
-            name = session.driver_name or "Kak"
-            category = session.problem_category or "masalah Anda"
+            # KB tidak nemu solusi spesifik
+            # Tetap kasih troubleshooting steps berdasarkan kategori
+            category = (session.problem_category or "service").lower()
+            category_steps = SmartDialogFlowHandler.KB_CATEGORY_FALLBACK_STEPS.get(
+                category,
+                SmartDialogFlowHandler.KB_GENERIC_FALLBACK_STEPS
+            )
+
+            steps_text = "\n".join(
+                f"{i}. **{title}** — {step}"
+                for i, (title, step) in enumerate(category_steps, 1)
+            )
+
             msg = (
-                f"{name}, sayangnya saya belum punya solusi otomatis untuk masalah *{category}* ini.\n\n"
-                f"Tapi tenang, saya akan buatkan tiket laporan ke tim teknisi kami supaya bisa ditangani langsung. 💪\n\n"
-                f"Saya butuh 3 informasi singkat:\n"
-                f"1️⃣ Nama unit/kendaraan\n"
-                f"2️⃣ Lokasi saat ini\n"
-                f"3️⃣ Waktu kejadian\n\n"
-                f"Pertama, *unit atau kendaraan mana* yang bermasalah?\n"
-                f"(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
+                f"{acknowledge_prefix or ''}"
+                f"Silakan coba langkah-langkah ini ya:\n\n"
+                f"{steps_text}\n\n"
+                f"Jika sudah dicoba dan masih bermasalah, saya bantu buat tiket ke tim teknisi.\n"
+                f"Sebutkan *unit* yang bermasalah ya."
             )
             return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
-        
+
         session.kb_solution = solutions[0]
         session.tried_kb_solution = True
         matched_category = solutions[0].get("category")
@@ -470,26 +528,26 @@ class SmartDialogFlowHandler:
                 matched_category.replace("_", " ").title(),
             )
         confidence = solutions[0].get("confidence", 0)
-        
+
         logger.info(f"✓ KB match: {solutions[0]['category']} ({confidence:.0%})")
-        
+
         # Generate CUSTOM troubleshooting based on actual problem, not hardcoded
-        custom_steps = f"""{session.driver_name}, ini solusi untuk masalah {session.problem_category} Anda:\n\n{solution_searcher.format_solution_for_user(
+        solution_text = solution_searcher.format_solution_for_user(
             session.kb_solution,
             user_context={"is_critical": session.problem_severity == "critical", "multiple_attempts": session.message_count, "frustrated": session.message_count > 4}
-        )}"""
-        
-        # Add feedback question right after solution
-        feedback_prompt = smart_response_system.format_question(
-            "Coba langkah-langkah di atas. Berhasil nggak?",
-            ["✅ Ya, berhasil!", "❌ Tidak, masih error"]
         )
-        
-        # Combine in ONE message (solution + feedback question)
-        combined_message = f"{custom_steps}\n\n{feedback_prompt}"
-        
+
+        # Add feedback question right after solution — tanpa menu nomor
+        feedback_prompt = (
+            "Coba langkah-langkah di atas. Berhasil nggak?\n\n"
+            "Silakan bilang *Ya* kalau sudah, atau *Tidak* kalau masih error."
+        )
+
+        # Combine in ONE message (acknowledge + solution + feedback question)
+        combined_message = f"{acknowledge_prefix or ''}{solution_text}\n\n{feedback_prompt}"
+
         return (smart_response_system.format_for_whatsapp(combined_message), DialogState.ASKING_SOLUTION_WORKED)
-    
+
     @staticmethod
     def _present_solution_smart(session: ConversationSession) -> Tuple[str, DialogState]:
         """Smart solution presentation with dynamic response generation"""
@@ -530,9 +588,9 @@ class SmartDialogFlowHandler:
         """
         if not user_message:
             return (
-                smart_response_system.format_question(
-                    "Apakah solusi di atas berhasil membantu?",
-                    ["Ya, berhasil!", "Tidak, masih error"]
+                smart_response_system.format_for_whatsapp(
+                    "Apakah solusi di atas berhasil membantu?\n\n"
+                    "Cukup bilang *Ya* kalau sudah, atau *Tidak* kalau masih error."
                 ),
                 DialogState.ASKING_SOLUTION_WORKED
             )
@@ -540,13 +598,29 @@ class SmartDialogFlowHandler:
         answer = user_message.lower().strip()
         answer_clean = re.sub(r'[!?.,;:]', '', answer).strip()
 
+        # Nomor menu harus dipetakan secara eksplisit sebelum keyword lain.
+        if answer_clean == "1":
+            session.solution_worked = True
+            msg = smart_response_system.format_success_message(
+                "solusi yang kami berikan",
+                ["Jika ada masalah lagi, hubungi kami kapan saja 😊"]
+            )
+            return (msg, DialogState.RESOLVED)
+        if answer_clean == "2":
+            msg = (
+                "Baik, saya akan bantu buat tiket laporan ke tim teknisi kami.\n\n"
+                "Ceritakan *unit atau kendaraan* yang bermasalah:\n"
+                "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
+            )
+            return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
+
         # Penting: acknowledgment seperti "oke", "siap", " lanjut" bukan konfirmasi
         # masalah sudah solved. Harus tanya lagi untuk memastikan.
         if answer_clean in SmartDialogFlowHandler.ACKNOWLEDGMENT_PATTERNS:
             return (
-                smart_response_system.format_question(
-                    "Siap. Setelah dicoba, apakah masalahnya sudah benar-benar berhasil diperbaiki?",
-                    ["Ya, berhasil", "Tidak, masih error"]
+                smart_response_system.format_for_whatsapp(
+                    "Siap. Setelah dicoba, apakah masalahnya sudah benar-benar berhasil diperbaiki?\n\n"
+                    "Silakan jawab *Ya* kalau sudah, atau *Tidak* kalau masih error."
                 ),
                 DialogState.ASKING_SOLUTION_WORKED
             )
@@ -588,21 +662,18 @@ class SmartDialogFlowHandler:
             # Solusi gagal - mulai eskalasi ke tim support
             logger.info(f"❌ Solution didn't work, escalating... User said: {user_message[:50]}")
             msg = (
-                "Baik, saya akan eskalasi ke tim teknisi kami.\n\n"
-                "Untuk membuat tiket laporan, saya butuh 3 informasi singkat:\n"
-                "1️⃣ Nama unit/kendaraan\n"
-                "2️⃣ Lokasi saat ini\n"
-                "3️⃣ Waktu kejadian\n\n"
-                "Pertama, *unit atau kendaraan mana* yang bermasalah?\n"
+                "Baik, saya akan bantu buat tiket laporan ke tim teknisi kami.\n\n"
+                "Ceritakan *unit atau kendaraan* yang bermasalah:\n"
                 "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
             )
             return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
 
         else:
-            # Tidak dikenali - tanya lagi dengan framing yang lebih jelas
-            msg = smart_response_system.format_question(
-                "Maaf, saya belum mengerti jawaban Anda.\nApakah solusi tadi berhasil memperbaiki masalahnya?",
-                ["✅ Ya, berhasil!", "❌ Tidak, masih error"]
+            # Tidak dikenali - tanya lagi tanpa menu nomor
+            msg = smart_response_system.format_for_whatsapp(
+                "Maaf, saya belum mengerti jawaban Anda.\n\n"
+                "Apakah solusi tadi berhasil memperbaiki masalahnya?\n"
+                "Silakan jawab *Ya* kalau sudah, atau *Tidak* kalau masih error."
             )
             return (msg, DialogState.ASKING_SOLUTION_WORKED)
 
@@ -632,7 +703,7 @@ class SmartDialogFlowHandler:
         }
         if station_lower in ack_words or len(station) == 0:
             prompt = (
-                "Terima kasih 😊 Tapi saya butuh nama *unit/kendaraan* yang bermasalah ya.\n\n"
+                "Maaf, saya butuh nama *unit/kendaraan* yang bermasalah.\n\n"
                 "Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_"
             )
             return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_UNIT)
@@ -652,7 +723,7 @@ class SmartDialogFlowHandler:
     
     @staticmethod
     def _handle_location_input(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
-        """Smart location handling"""
+        """Smart location handling with context validation"""
         if not user_message or len(user_message.strip()) < 1:
             prompt = (
                 "*Di mana lokasi* unit/kendaraan saat ini?\n\n"
@@ -662,10 +733,10 @@ class SmartDialogFlowHandler:
                 "• Pool/garasi (misal: _Pool Cakung_, _Depo Cilincing_)"
             )
             return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_LOCATION)
-        
+
         location = user_message.strip()
         location_lower = location.lower()
-        
+
         # Filter out acknowledgment words — these are NOT valid locations
         ack_words = {
             'ok', 'oke', 'okeh', 'okay', 'baik', 'siap', 'sudah', 'mengerti',
@@ -675,17 +746,43 @@ class SmartDialogFlowHandler:
         }
         if location_lower in ack_words:
             prompt = (
-                "Terima kasih 😊 Tapi saya butuh info *lokasi* unit/kendaraan saat ini ya.\n\n"
+                "Maaf, saya butuh info *lokasi* unit/kendaraan saat ini.\n\n"
                 "Contoh: _Jakarta_, _Tol Cikampek KM 5_, atau _Pool Cakung_"
             )
             return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_LOCATION)
-        
+
+        # VALIDASI: Tolak input yang jelas-jelas BUKAN lokasi
+        # Cek kata-kata yang menunjukkan waktu, bukan lokasi
+        time_indicators = ['hari ini', 'hari kemarin', 'hari senin', 'hari selasa',
+                          'hari rabu', 'hari kamis', 'hari jumat', 'hari sabtu', 'hari minggu',
+                          'tadi pagi', 'tadi siang', 'tadi sore', 'tadi malam',
+                          'kemarin', 'besok', 'pagi ini', 'siang ini', 'sore ini', 'malam ini',
+                          'khari', 'hari2', 'pagi', 'siang', 'sore', 'malam']
+        for indicator in time_indicators:
+            if indicator in location_lower:
+                prompt = (
+                    "Sepertinya itu *waktu*, bukan lokasi 🙏\n\n"
+                    "*Di mana lokasi* unit/kendaraan saat ini?\n\n"
+                    "Contoh: _Jakarta_, _Tol Cikampek KM 5_, _Pool Cakung_, atau _Bandara Soetta_"
+                )
+                return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_LOCATION)
+
+        # Cek typo umum "hari ini" -> "khari ini", "hori ini", dll
+        # Jika input pendek dan mengandung "hari", itu kemungkinan typo waktu
+        if len(location) < 15 and 'hari' in location_lower:
+            prompt = (
+                "Sepertinya maksud Anda *lokasi*, bukan waktu 🙏\n\n"
+                "*Di mana lokasi* unit/kendaraan saat ini?\n\n"
+                "Contoh: _Jakarta_, _Tol Cikampek KM 5_, _Pool Cakung_"
+            )
+            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_LOCATION)
+
         session.location = location
         logger.info(f"✓ Location: {location}")
-        
+
         msg = (
             f"✅ Lokasi: *{location}*\n\n"
-            f"Terakhir, *kapan masalah ini terjadi*?\n\n"
+            f"Sekarang, *kapan masalah ini terjadi*?\n\n"
             f"Bisa jawab dengan:\n"
             f"• Jam spesifik (misal: _14:30_, _jam 3 sore_)\n"
             f"• Waktu umum (misal: _tadi pagi_, _kemarin sore_)\n"
@@ -699,63 +796,272 @@ class SmartDialogFlowHandler:
         if not user_message:
             prompt = (
                 "*Kapan masalah ini terjadi?*\n\n"
-                "Bisa jawab dengan:\n"
+                "Boleh jawab dengan:\n"
                 "• Jam spesifik (misal: _14:30_, _jam 3 sore_)\n"
                 "• Waktu umum (misal: _tadi pagi_, _kemarin sore_)\n"
-                "• _sekarang_ / _barusan_ jika baru terjadi"
+                "• _sekarang_ / _barusan_ kalau baru terjadi"
             )
             return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_TIME)
-        
+
         user_input = user_message.lower().strip()
-        
+
+        # Fix typo "khari ini" -> "hari ini"
+        user_input = user_input.replace('khari', 'hari')
+        user_input = user_input.replace('hori', 'hari')
+
         # Try to extract time - multiple formats
         time_text = None
-        
-        # Format: HH:MM
-        time_match = re.search(r'(\d{1,2}):(\d{2})', user_input)
-        if time_match:
-            time_text = f"{time_match.group(1)}:{time_match.group(2)}"
-        # Format: "jam 3", "jam 3 sore", "3 sore", "3 jam", etc
-        elif re.search(r'(jam\s+)?(\d{1,2})', user_input):
-            match = re.search(r'(jam\s+)?(\d{1,2})', user_input)
-            hour = int(match.group(2))
-            # Check if afternoon/evening mentioned
-            if 'sore' in user_input or 'malam' in user_input:
-                if hour < 12:
-                    hour += 12
-            time_text = f"{hour}:00"
-        elif 'sekarang' in user_input or 'baru' in user_input:
-            time_text = datetime.now().strftime("%H:%M")
-        elif 'tadi' in user_input or 'barusan' in user_input:
-            time_text = "~15 menit yang lalu"
-        else:
-            # Try to parse natural language time
-            time_keywords = {
-                'pagi': '09:00', 'siangan': '12:00', 'siang': '12:00',
-                'sore': '15:00', 'malam': '19:00', 'tengah malam': '00:00',
-                'subuh': '05:30', 'fajar': '05:30'
-            }
-            for keyword, default_time in time_keywords.items():
-                if keyword in user_input:
-                    time_text = default_time
+
+        # VALIDASI: Jika input mengandung "di" atau "lokasinya" di awal, ini LOKASI bukan waktu
+        if user_input.startswith('di ') or 'lokasinya' in user_input:
+            prompt = (
+                "Sepertinya itu *lokasi*, bukan waktu 🙏\n\n"
+                "*Kapan masalah ini terjadi?*\n\n"
+                "Bisa jawab dengan:\n"
+                "• _tadi pagi_, _kemarin sore_, _sekarang_"
+            )
+            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_TIME)
+
+        # Cek "hari ini" dulu karena sering disalahartikan
+        if user_input in ['hari ini', 'hari2 ini', 'hr ini', 'hari ini deh', 'hari ini dong']:
+            from datetime import date
+            today = date.today()
+            time_text = f"{today.strftime('%d/%m')}, hari ini"
+        elif 'hari ini' in user_input:
+            # "hari ini pagi" atau "hari ini siang"
+            from datetime import date
+            today = date.today()
+            if 'pagi' in user_input:
+                time_text = f"{today.strftime('%d/%m')}, pagi"
+            elif 'siang' in user_input:
+                time_text = f"{today.strftime('%d/%m')}, siang"
+            elif 'sore' in user_input:
+                time_text = f"{today.strftime('%d/%m')}, sore"
+            elif 'malam' in user_input:
+                time_text = f"{today.strftime('%d/%m')}, malam"
+            else:
+                time_text = f"{today.strftime('%d/%m')}, hari ini"
+
+        # Format: HH:MM atau HH.MM - HANYA jika ada colon/period DAN ada context waktu
+        elif re.search(r'(\d{1,2})[.:](\d{2})', user_input):
+            time_match = re.search(r'(\d{1,2})[.:](\d{2})', user_input)
+            hour = int(time_match.group(1))
+            minute = int(time_match.group(2))
+            # Validasi: jam harus 0-23, menit harus 0-59
+            if hour <= 23 and minute <= 59:
+                # Cek apakah ada context waktu (sore, malam, pagi, dll)
+                if 'sore' in user_input or 'malam' in user_input:
+                    if hour < 12:
+                        hour += 12
+                time_text = f"{hour:02d}:{minute:02d}"
+
+        # Format: "jam X" atau "jam X sore/malam"
+        elif re.search(r'jam\s+(\d{1,2})', user_input):
+            match = re.search(r'jam\s+(\d{1,2})', user_input)
+            hour = int(match.group(1))
+            if hour <= 23:
+                if 'sore' in user_input or 'malam' in user_input:
+                    if hour < 12:
+                        hour += 12
+                time_text = f"{hour:00}:00"
+
+        # Cek kemarin dengan waktu
+        elif 'kemarin' in user_input:
+            from datetime import date, timedelta
+            yesterday = date.today() - timedelta(days=1)
+            if 'pagi' in user_input:
+                time_text = f"{yesterday.strftime('%d/%m')}, pagi"
+            elif 'siang' in user_input:
+                time_text = f"{yesterday.strftime('%d/%m')}, siang"
+            elif 'sore' in user_input:
+                time_text = f"{yesterday.strftime('%d/%m')}, sore"
+            elif 'malam' in user_input:
+                time_text = f"{yesterday.strftime('%d/%m')}, malam"
+            else:
+                time_text = f"{yesterday.strftime('%d/%m')}, kemarin"
+
+        # Cek "tadi X" patterns
+        elif 'tadi pagi' in user_input or user_input == 'tadi':
+            time_text = "Hari ini, pagi"
+        elif 'tadi siang' in user_input:
+            time_text = "Hari ini, siang"
+        elif 'tadi sore' in user_input:
+            time_text = "Hari ini, sore"
+        elif 'tadi malam' in user_input:
+            time_text = "Hari ini, malam"
+        elif 'barusan' in user_input or user_input == 'baru':
+            time_text = datetime.now().strftime("%H:%M") + " (barusan)"
+        elif 'sekarang' in user_input:
+            time_text = datetime.now().strftime("%H:%M") + " (sekarang)"
+
+        # Cek typo "tadi apgi" -> "tadi pagi"
+        elif 'tadi' in user_input and ('apgi' in user_input or 'agi' in user_input or 'pagii' in user_input):
+            # Cek apakah ada tanggal
+            date_match = re.search(r'tgl\s*(\d{1,2})\s*(?:juni|jul|agust|sep|okt|nov|des|jan|feb|mar|apr|mei)', user_input)
+            if date_match:
+                from datetime import date
+                day = date_match.group(1)
+                # Map bulan
+                bulan_map = {'juni': 6, 'jul': 7, 'agust': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12,
+                            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'mei': 5}
+                for bulan, num in bulan_map.items():
+                    if bulan in user_input:
+                        month = num
+                        break
+                year = date.today().year
+                # Cek "pagi" atau typo lainnya
+                if 'apgi' in user_input or 'agi' in user_input or 'pagii' in user_input:
+                    time_text = f"{day}/{month:02d}, pagi"
+                elif 'siang' in user_input:
+                    time_text = f"{day}/{month:02d}, siang"
+                elif 'sore' in user_input:
+                    time_text = f"{day}/{month:02d}, sore"
+                elif 'malam' in user_input:
+                    time_text = f"{day}/{month:02d}, malam"
+                else:
+                    time_text = f"{day}/{month:02d}"
+            else:
+                time_text = "Hari ini, pagi"
+
+        # Cek tanggal spesifik "tgl 23 Juni" tanpa waktu
+        elif re.search(r'tgl\.?\s*(\d{1,2})\s*(?:juni|jul|agust|sep|okt|nov|des|jan|feb|mar|apr|mei)', user_input):
+            date_match = re.search(r'tgl\.?\s*(\d{1,2})\s*(?:juni|jul|agust|sep|okt|nov|des|jan|feb|mar|apr|mei)', user_input)
+            day = int(date_match.group(1))
+            bulan_map = {'juni': 6, 'jul': 7, 'agust': 8, 'sep': 9, 'okt': 10, 'nov': 11, 'des': 12,
+                        'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'mei': 5}
+            month = None
+            for bulan, num in bulan_map.items():
+                if bulan in user_input:
+                    month = num
                     break
-        
+            if month:
+                time_text = f"{day:02d}/{month:02d}"
+            else:
+                time_text = f"{day:02d}"
+
+        # Waktu umum: pagi, siang, sore, malam
+        else:
+            time_keywords = {
+                'pagi': 'pagi', 'siangan': 'siang', 'siang': 'siang',
+                'sore': 'sore', 'malam': 'malam', 'tengah malam': '00:00',
+                'subuh': 'subuh', 'fajar': 'fajar'
+            }
+            for keyword, time_val in time_keywords.items():
+                if keyword in user_input:
+                    time_text = f"Hari ini, {time_val}"
+                    break
+
         if not time_text:
             prompt = (
                 "Maaf, saya kurang mengerti waktunya 🙏\n\n"
                 "Coba tulis ulang dengan format seperti:\n"
-                "• _14:30_ atau _jam 3 sore_\n"
                 "• _tadi pagi_ atau _kemarin malam_\n"
+                "• _jam 3 sore_ atau _pagi ini_\n"
                 "• _sekarang_ atau _barusan_"
             )
             return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_TIME)
-        
+
         session.issue_time = time_text
         logger.info(f"✓ Time: {time_text}")
-        
+
         # Show summary and ask confirmation
         return SmartDialogFlowHandler._show_summary(session)
     
+    @staticmethod
+    def _handle_correction_input(session: ConversationSession, user_message: str) -> Tuple[str, DialogState]:
+        """Handle correction - user specifies which field to correct"""
+        if not user_message:
+            msg = (
+                "Data mana yang ingin diperbaiki?\n\n"
+                "• _unit_ atau _kendaraan_\n"
+                "• _lokasi_\n"
+                "• _waktu_\n"
+                "• _semua_\n\n"
+                "Silakan ketik saja."
+            )
+            return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_CORRECTION)
+
+        user_input = user_message.lower().strip()
+
+        # Fix typo
+        user_input = user_input.replace('*', '').strip()
+
+        # Cek apa yang mau dikoreksi
+        unit_keywords = ['unit', 'kendaraan', 'vehicle', 'armada', 'truk', 'mobil', 'plat', 'nomor', 'no.polisi']
+        location_keywords = ['lokasi', 'tempat', 'area', 'alamat', 'di mana', 'lokasinya']
+        time_keywords = ['waktu', 'kapan', 'jam', 'tanggal', 'pagi', 'siang', 'sore', 'malam', 'kemarin', 'tadi']
+        all_keywords = ['semua', 'reset', 'ulangi', 'ulang', '全部']
+
+        # Cek keywords
+        wants_unit = any(kw in user_input for kw in unit_keywords)
+        wants_location = any(kw in user_input for kw in location_keywords)
+        wants_time = any(kw in user_input for kw in time_keywords)
+        wants_all = any(kw in user_input for kw in all_keywords)
+
+        # Jika input tidak dikenali, tanya lagi
+        if not (wants_unit or wants_location or wants_time or wants_all):
+            msg = (
+                "Maaf, saya kurang mengerti 🙏\n\n"
+                "Silakan ketik:\n"
+                "• _unit_ untuk koreksi kendaraan\n"
+                "• _lokasi_ untuk koreksi tempat\n"
+                "• _waktu_ untuk koreksi kapan\n"
+                "• _semua_ untuk koreksi semuanya"
+            )
+            return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_CORRECTION)
+
+        # Tentukan field mana yang perlu dikoreksi
+        fields_to_correct = []
+        if wants_all:
+            fields_to_correct = ['unit', 'location', 'time']
+        else:
+            if wants_unit:
+                fields_to_correct.append('unit')
+            if wants_location:
+                fields_to_correct.append('location')
+            if wants_time:
+                fields_to_correct.append('time')
+
+        # Handle berdasarkan field pertama yang perlu dikoreksi
+        # Clear data yang mau dikoreksi
+        if 'unit' in fields_to_correct:
+            session.vehicle_unit = None
+        if 'location' in fields_to_correct:
+            session.location = None
+        if 'time' in fields_to_correct:
+            session.issue_time = None
+
+        # Tanya field pertama yang kosong
+        if 'unit' in fields_to_correct and not session.vehicle_unit:
+            prompt = (
+                "Oke, kita koreksi ya.\n\n"
+                "*Unit atau kendaraan mana* yang bermasalah?\n"
+                "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
+            )
+            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_UNIT)
+
+        if 'location' in fields_to_correct and not session.location:
+            prompt = (
+                "Oke, kita koreksi ya.\n\n"
+                "*Di mana lokasi* unit/kendaraan saat ini?\n\n"
+                "Contoh: _Jakarta_, _Tol Cikampek KM 5_, _Pool Cakung_"
+            )
+            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_LOCATION)
+
+        if 'time' in fields_to_correct and not session.issue_time:
+            prompt = (
+                "Oke, kita koreksi ya.\n\n"
+                "*Kapan masalah ini terjadi?*\n\n"
+                "Bisa jawab dengan:\n"
+                "• _tadi pagi_, _kemarin sore_\n"
+                "• _jam 3 sore_\n"
+                "• _sekarang_ atau _barusan_"
+            )
+            return (smart_response_system.format_for_whatsapp(prompt), DialogState.COLLECTING_TIME)
+
+        # Semua field sudah terisi, tanya konfirmasi lagi
+        return SmartDialogFlowHandler._show_summary(session)
+
     @staticmethod
     def _show_summary(session: ConversationSession) -> Tuple[str, DialogState]:
         """Show summary before creating ticket with confirmation question"""
@@ -775,9 +1081,10 @@ class SmartDialogFlowHandler:
             f"{'─' * 25}\n\n"
         )
         
-        # Use hardcoded confirmation question (not AI - too error-prone)
-        confirmation_question = "Apakah data di atas sudah benar? 🤔\n\n1️⃣ *Ya*, lanjutkan buat tiket\n2️⃣ *Tidak*, saya mau perbaiki"
-        
+        # Natural confirmation question — user bisa jawab "ya", "iya", "betul" dll.
+        # _handle_confirmation sudah support keyword matching (bukan exact set).
+        confirmation_question = "Apakah data di atas sudah benar? 🤔\n\nSilakan jawab *Ya* atau *Tidak*, boleh pakai kata-kata sendiri."
+
         # Combine summary with confirmation question
         final_message = summary_text + confirmation_question
         
@@ -814,18 +1121,24 @@ class SmartDialogFlowHandler:
             return (smart_response_system.format_for_whatsapp(msg), DialogState.CREATING_TICKET)
 
         elif is_negative:
-            session.vehicle_unit = None
-            session.location = None
-            session.issue_time = None
+            # User mau koreksi data - tanya field mana yang mau diubah
+            session.correction_mode = True
             msg = (
-                "Baik, kita ulangi datanya ya.\n\n"
-                "*Unit atau kendaraan mana* yang bermasalah?\n"
-                "(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
+                "Data mana yang ingin diperbaiki?\n\n"
+                "• _unit_ atau _kendaraan_\n"
+                "• _lokasi_\n"
+                "• _waktu_\n"
+                "• _semua_\n\n"
+                "Silakan ketik saja ya."
             )
-            return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
+            return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_CORRECTION)
 
         else:
-            msg = "Mohon pilih salah satu ya:\n\n1️⃣ Ya, data sudah benar\n2️⃣ Tidak, saya mau ubah\n\n(Kirim 1 atau 2)"
+            msg = (
+                "Hmm, saya belum menangkap jawabannya 🙏\n\n"
+                "Cukup bilang *Ya* kalau data sudah benar, "
+                "atau *Tidak* kalau mau diperbaiki."
+            )
             return (smart_response_system.format_for_whatsapp(msg), DialogState.CONFIRMING_DETAILS)
 
     
@@ -834,8 +1147,22 @@ class SmartDialogFlowHandler:
         """Ask for unit info with clear prompt"""
         name = session.driver_name or "Kak"
         msg = (
-            f"Baik {name}, untuk membuat tiket laporan, saya butuh 3 data singkat.\n\n"
+            f"Baik {name}, untuk bikin tiket laporan, saya butuh 3 data singkat ya.\n\n"
             f"Pertama, *unit atau kendaraan mana* yang bermasalah?\n"
             f"(Contoh: _B 1234 AB_, _TRAM-001_, _Unit GPS-05_, atau _nama perusahaan_)"
         )
         return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_UNIT)
+
+    @staticmethod
+    def _ask_for_location(session: ConversationSession) -> Tuple[str, DialogState]:
+        """Ask for location info with clear prompt"""
+        unit = session.vehicle_unit or "unit tersebut"
+        msg = (
+            f"✅ Unit: *{unit}*\n\n"
+            f"Lanjut ya, *di mana lokasi* {unit} saat ini?\n\n"
+            f"Bisa sebut:\n"
+            f"• Nama kota/kabupaten (misal: _Jakarta_, _Surabaya_)\n"
+            f"• Area/jalan (misal: _Tol Cikampek KM 5_, _Bandara Soetta_)\n"
+            f"• Pool/garasi (misal: _Pool Cakung_, _Depo Cilincing_)"
+        )
+        return (smart_response_system.format_for_whatsapp(msg), DialogState.COLLECTING_LOCATION)

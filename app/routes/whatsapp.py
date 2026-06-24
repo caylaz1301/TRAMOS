@@ -18,6 +18,12 @@ from app.services.chatbot.whatsapp_service import whatsapp_service
 from app.services.chatbot import session_manager as sm_module
 from app.services.chatbot.session_manager import DialogState
 from app.services.chatbot.smart_dialog_flow import SmartDialogFlowHandler
+from app.services.chatbot.conversation_coordinator import conversation_coordinator
+from app.services.chatbot.dialog_dispatcher import (
+    DialogFlowDispatcher,
+    DialogTurnResult,
+)
+from app.services.chatbot.intent_classifier import TramosIntentClassifier
 from app.services.chatbot.nlp_extractor import problem_extractor
 from app.utils.smart_response_system import smart_response_system
 from app.schemas.ticket import CreateTicketRequest
@@ -25,38 +31,6 @@ from app.services.database_tracker import db_tracker
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="", tags=["whatsapp"])
-
-# ============================================================================
-# MESSAGE DEDUPLICATION - Prevent duplicate webhook processing
-# Meta can send the same webhook event multiple times
-# ============================================================================
-_processed_message_ids: dict = {}  # {message_id: timestamp}
-_DEDUP_WINDOW = 30  # seconds to keep message IDs
-_DEDUP_MAX_SIZE = 1000  # max entries to prevent memory leak
-
-def _is_duplicate_message(message_id: str) -> bool:
-    """Check if this message was already processed (Meta duplicate webhook)"""
-    import time
-    now = time.time()
-    
-    # Clean old entries (older than dedup window)
-    expired = [mid for mid, ts in _processed_message_ids.items() if now - ts > _DEDUP_WINDOW]
-    for mid in expired:
-        del _processed_message_ids[mid]
-    
-    # Hard cap: evict oldest entries if dict is too large (prevents memory leak)
-    if len(_processed_message_ids) >= _DEDUP_MAX_SIZE:
-        sorted_ids = sorted(_processed_message_ids.items(), key=lambda x: x[1])
-        for mid, _ in sorted_ids[:len(sorted_ids) // 2]:  # Remove oldest 50%
-            del _processed_message_ids[mid]
-    
-    if message_id in _processed_message_ids:
-        logger.warning(f"⚠️ Duplicate message detected: {message_id}, skipping")
-        return True
-    
-    _processed_message_ids[message_id] = now
-    return False
-
 
 def get_session_manager():
     """Get the globally initialized session manager"""
@@ -123,6 +97,7 @@ async def handle_incoming_message(request: Request) -> Response:
     3. Generate response based on intent and KB
     4. Send response back via WhatsApp API
     """
+    claimed_message_id = ""
     try:
         body = await request.json()
         
@@ -203,12 +178,14 @@ async def handle_incoming_message(request: Request) -> Response:
         
         # ====== DEDUPLICATION: Skip if already processed ======
         wa_message_id = message.get("id", "")
-        if wa_message_id and _is_duplicate_message(wa_message_id):
+        if wa_message_id and not await conversation_coordinator.claim_message(wa_message_id):
+            logger.warning("Duplicate WhatsApp message skipped: %s", wa_message_id)
             return Response(
                 content=json.dumps({"status": "ok", "duplicate": True}), 
                 media_type="application/json",
                 status_code=200
             )
+        claimed_message_id = wa_message_id
         
         # Get user profile
         contacts = value.get("contacts", [{}])[0]
@@ -217,17 +194,29 @@ async def handle_incoming_message(request: Request) -> Response:
         logger.info(f"📱 [{from_phone}] {user_name}: {message_body[:80]}")
         
         # ====== PROCESS MESSAGE WITH AI ======
-        response_text = await process_message_with_ai(
+        thinking_message, response_text = await process_message_with_ai(
             message_body=message_body,
             user_name=user_name,
             phone_number=from_phone
         )
-        
+
         # Debug: Log response content
         logger.debug(f"Response content: '{response_text[:200]}...' (length: {len(response_text)})")
-        
+
         # ====== SEND RESPONSE VIA WHATSAPP ======
         if whatsapp_service.is_configured():
+            # Kirim thinking message dulu (bubble "⏳ Sebentar...") jika ada
+            if thinking_message and thinking_message.strip():
+                send_thinking = await whatsapp_service.send_message(from_phone, thinking_message)
+                if send_thinking:
+                    logger.info(f"✅ Thinking message sent to {from_phone}")
+
+                # Tambah jeda 2.5 detik untuk efek "bot sedang memproses"
+                # Ini bikin user ngerasa bot beneran lagi cari solusi
+                import asyncio
+                await asyncio.sleep(2.5)
+
+            # Baru kirim response utama (solusi)
             if not response_text or response_text.strip() == "":
                 logger.warning(f"⚠️ Response is empty for {from_phone}, skipping send")
             else:
@@ -246,6 +235,8 @@ async def handle_incoming_message(request: Request) -> Response:
         )
     
     except json.JSONDecodeError:
+        if claimed_message_id:
+            await conversation_coordinator.release_message(claimed_message_id)
         logger.error("❌ Invalid JSON in webhook")
         return Response(
             content=json.dumps({"error": "invalid_json"}), 
@@ -254,6 +245,8 @@ async def handle_incoming_message(request: Request) -> Response:
         )
     
     except Exception as e:
+        if claimed_message_id:
+            await conversation_coordinator.release_message(claimed_message_id)
         logger.error(f"❌ Error processing webhook: {str(e)}", exc_info=True)
         return Response(
             content=json.dumps({"error": "internal_error"}), 
@@ -277,7 +270,237 @@ async def handle_incoming_message(request: Request) -> Response:
 # 3. Transisi ke state berikutnya
 # 4. Logging untuk analytics
 
+RESET_COMMANDS = {
+    "reset",
+    "mulai ulang",
+    "ulang",
+    "batal",
+    "cancel",
+    "restart",
+}
+MENU_COMMANDS = {
+    "menu",
+    "bantuan",
+    "help",
+    "mulai",
+    "halo",
+    "hai",
+    "hi",
+}
+
+
+def _normalize_command(message: str) -> str:
+    """Normalisasi ringan untuk perintah global WhatsApp."""
+    return TramosIntentClassifier.normalize(message)
+
+
+def _close_tracked_conversation(session) -> None:
+    """Tutup conversation analytics jika sesi lama sudah selesai/dibatalkan."""
+    conv_id = getattr(session, "_db_conversation_id", None)
+    if conv_id:
+        final_state = "resolved" if session.current_state == DialogState.RESOLVED else "closed"
+        db_tracker.close_conversation(conv_id, final_state)
+
+
+def _ensure_tracking_session(session, phone_number: str, user_name: str) -> None:
+    """Pastikan tabel user dan conversation siap sebelum turn dicatat."""
+    user_id = db_tracker.get_or_create_user(phone_number, user_name)
+    if user_id and not getattr(session, "_db_conversation_id", None):
+        session._db_conversation_id = db_tracker.get_or_create_conversation(
+            phone_number,
+            user_id,
+        )
+
+
+def _record_solution_analytics(session, phone_number: str, result: DialogTurnResult) -> None:
+    """Catat apakah solusi KB berhasil atau perlu dieskalasi."""
+    if not getattr(session, "_db_conversation_id", None):
+        return
+
+    if (
+        result.intent == "troubleshooting"
+        and result.next_state == DialogState.ASKING_SOLUTION_WORKED
+        and session.kb_solution
+        and not getattr(session, "_db_solution_attempt_id", None)
+    ):
+        session._db_solution_attempt_id = db_tracker.log_solution_attempt(
+            conversation_id=session._db_conversation_id,
+            phone_number=phone_number,
+            solution_id=session.kb_solution.get("category", "unknown"),
+            category=session.problem_category or "Service",
+            problem_description=session.problem_description or "",
+            kb_match_score=session.kb_solution.get("confidence"),
+        )
+
+    if not result.solution_outcome:
+        return
+
+    attempt_id = getattr(session, "_db_solution_attempt_id", None)
+    if not attempt_id:
+        attempt_id = db_tracker.get_active_solution_attempt(session._db_conversation_id)
+
+    if result.solution_outcome == "worked":
+        session.solution_worked = True
+        if attempt_id:
+            db_tracker.update_solution_outcome(attempt_id, "worked")
+        db_tracker.update_user_profile(phone_number, session.problem_category, issue_resolved=True)
+        conv_duration = (session.last_activity - session.created_at).total_seconds() / 60
+        db_tracker.create_ai_resolution(
+            session._db_conversation_id,
+            phone_number,
+            session.problem_category,
+            resolution_time_minutes=int(conv_duration),
+        )
+        db_tracker.close_conversation(session._db_conversation_id, "resolved")
+    elif result.solution_outcome == "escalated":
+        if attempt_id:
+            db_tracker.update_solution_outcome(
+                attempt_id,
+                "escalated",
+                escalation_needed=True,
+            )
+
+
+def _record_turn(session, phone_number: str, message_body: str, response: str,
+                 result: DialogTurnResult, turn_start: float) -> None:
+    """Simpan analytics turn dan state conversation secara konsisten."""
+    if not getattr(session, "_db_conversation_id", None):
+        return
+
+    _track_turn(
+        session,
+        phone_number,
+        message_body,
+        response,
+        session.current_state.value,
+        result.intent,
+        result.category,
+        turn_start,
+    )
+    db_tracker.update_conversation_state(
+        session._db_conversation_id,
+        session.current_state.value,
+        category=session.problem_category,
+        intent=result.intent,
+        issue_description=session.problem_description,
+    )
+    db_tracker.update_context(
+        phone_number,
+        session.current_state.value,
+        category=session.problem_category,
+        issue_description=session.problem_description,
+        last_intent=result.intent,
+        context_data={
+            "unit": session.vehicle_unit,
+            "location": session.location,
+            "issue_time": session.issue_time,
+            "mode": session.interaction_mode,
+        },
+    )
+
+
 async def process_message_with_ai(
+    message_body: str,
+    user_name: str,
+    phone_number: str
+) -> Tuple[str, str]:
+    """Entry point baru: satu pesan, satu lock, satu transisi state.
+    Returns: (thinking_message, response) - thinking_message bisa kosong."""
+    try:
+        async with conversation_coordinator.turn_lock(phone_number):
+            return await _process_message_turn(message_body, user_name, phone_number)
+    except TimeoutError:
+        return (
+            "",
+            "Pesan sebelumnya masih saya proses. Mohon tunggu sebentar, "
+            "lalu kirim pesan berikutnya setelah balasan muncul."
+        )
+
+
+async def _process_message_turn(
+    message_body: str,
+    user_name: str,
+    phone_number: str,
+) -> Tuple[str, str]:
+    """Proses inti setelah lock per nomor berhasil didapat.
+    Returns: (thinking_message, response) - thinking_message bisa kosong."""
+    import time as _time
+
+    turn_start = _time.time()
+    session_manager = get_session_manager()
+    if session_manager is None:
+        logger.error("Session manager is not initialized")
+        return ("", "Layanan TRAMOS sedang memulai ulang. Mohon coba lagi sebentar.")
+
+    command = _normalize_command(message_body)
+    session = session_manager.get_or_create_session(phone_number, force_reload=True)
+    session.update_activity()
+
+    if command in RESET_COMMANDS:
+        _close_tracked_conversation(session)
+        session_manager.close_session(phone_number)
+        session = session_manager.create_session(phone_number)
+    elif session.current_state in (DialogState.CLOSED, DialogState.RESOLVED):
+        _close_tracked_conversation(session)
+        session_manager.close_session(phone_number)
+        session = session_manager.create_session(phone_number)
+
+    _ensure_tracking_session(session, phone_number, user_name)
+
+    if command in MENU_COMMANDS and session.current_state == DialogState.COLLECTING_PROBLEM:
+        # Di state COLLECTING_PROBLEM, problem_prompt tidak dipanggil ulang —
+        # session baru tidak otomatis kirim prompt lagi. User ketik sendiri untuk mulai laporan baru.
+        session.clear_issue_data()
+        if session.driver_name:
+            session.current_state = DialogState.COLLECTING_PROBLEM
+            result = DialogTurnResult(
+                DialogFlowDispatcher.problem_prompt("Menu bantuan TRAMOS."),
+                DialogState.COLLECTING_PROBLEM,
+                "menu",
+            )
+        else:
+            session.current_state = DialogState.GREETING
+            result = DialogFlowDispatcher.dispatch(session, message_body)
+    else:
+        result = DialogFlowDispatcher.dispatch(session, message_body)
+
+    session.add_message(
+        sender="user",
+        message=message_body,
+        intent=result.intent,
+        category=result.category,
+    )
+    session.current_state = result.next_state
+    session.last_intent = result.intent
+    if result.category:
+        session.problem_category = result.category
+
+    if session.driver_name:
+        db_tracker.update_user_name(phone_number, session.driver_name)
+
+    if result.action == "create_ticket":
+        session_manager.save_session(session)
+        response = await _create_ticket_from_session(session, phone_number, user_name)
+        _record_turn(session, phone_number, message_body, response, result, turn_start)
+        return ("", response)
+
+    _record_solution_analytics(session, phone_number, result)
+    response = result.response
+    session.add_message(
+        sender="bot",
+        message=response,
+        intent=result.intent,
+        category=result.category,
+    )
+    session_manager.save_session(session)
+    _record_turn(session, phone_number, message_body, response, result, turn_start)
+
+    # Kembalikan thinking_message jika ada (untuk bubble "⏳ Sebentar...")
+    thinking_msg = getattr(result, 'thinking_message', None) or ""
+    return (thinking_msg, response)
+
+
+async def _legacy_process_message_with_ai(
     message_body: str, 
     user_name: str, 
     phone_number: str
@@ -481,9 +704,22 @@ async def process_message_with_ai(
         return response
     
     elif session.current_state == DialogState.COLLECTING_UNIT:
-        # Collect vehicle unit/equipment ID - delegate to SmartDialogFlowHandler for validation
+        # Guard: jika user bilang negatif → langsung eskalasi, jangan jadi nama unit
+        negative_words = {'tidak', 'no', 'nggak', 'gak', 'ga', 'nope', 'enggak', 'skip'}
+        msg_clean = re.sub(r'[!?.,;:\s]+', ' ', message_body.lower()).strip()
+        if msg_clean in negative_words or any(f"tidak {w}" in msg_clean for w in ['bisa', 'ada', 'tau', 'punya']):
+            session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
+            response = SmartDialogFlowHandler._ask_for_unit(session)[0]
+            session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, DialogState.COLLECTING_UNIT.value,
+                    intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+            return response
+
         session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
-        
         response, next_state = SmartDialogFlowHandler._handle_unit_input(session, message_body)
         session.current_state = next_state
         session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
@@ -494,11 +730,24 @@ async def process_message_with_ai(
                 session._db_conversation_id, session.message_count, next_state.value,
                 intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
         return response
-    
+
     elif session.current_state == DialogState.COLLECTING_LOCATION:
-        # Collect location - delegate to SmartDialogFlowHandler for validation
+        # Guard: jika user bilang negatif → minta ulang lokasi, jangan jadi lokasi
+        negative_words = {'tidak', 'no', 'nggak', 'gak', 'ga', 'nope', 'enggak', 'skip'}
+        msg_clean = re.sub(r'[!?.,;:\s]+', ' ', message_body.lower()).strip()
+        if msg_clean in negative_words or any(f"tidak {w}" in msg_clean for w in ['tau', 'ada', 'punya', 'tahu']):
+            session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
+            response = SmartDialogFlowHandler._ask_for_location(session)[0]
+            session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, DialogState.COLLECTING_LOCATION.value,
+                    intent="data_collection", category=session.problem_category, processing_time_ms=_ms)
+            return response
+
         session.add_message(sender="user", message=message_body, intent="data_collection", category=session.problem_category)
-        
         response, next_state = SmartDialogFlowHandler._handle_location_input(session, message_body)
         session.current_state = next_state
         session.add_message(sender="bot", message=response, intent="data_collection", category=session.problem_category)
@@ -526,15 +775,37 @@ async def process_message_with_ai(
         return response
     
     elif session.current_state == DialogState.CONFIRMING_DETAILS:
-        # Confirm all collected data before creating ticket
-        session.add_message(sender="user", message=message_body, intent="confirmation", category=session.problem_category)
-        
+        # Check if user is saying "tidak / no / 2" — this is CONFIRMATION, not detail
+        NEGATIVE_CONFIRM_KW = [
+            'tidak', 'no', 'nggak', 'gak', 'ga', 'bukan', 'nope', 'enggak',
+            'salah', 'salah', 'tdk', 'engga', 'nope', 'nag', 'engga'
+        ]
+        is_negative_confirm = any(kw in message_lower for kw in NEGATIVE_CONFIRM_KW)
+
+        if is_negative_confirm and len(message_body.strip()) < 20:
+            # User said "tidak" or similar — handle as confirmation rejection, NOT problem detail
+            # Don't check detail_keywords — "tidak, masih error" is a confirmation answer
+            session.add_message(sender="user", message=message_body, intent="confirmation", category=session.problem_category)
+            response, next_state = SmartDialogFlowHandler._handle_confirmation(session, "tidak")
+            session.current_state = next_state
+            session.add_message(sender="bot", message=response, intent="confirmation", category=session.problem_category)
+            get_session_manager().save_session(session)
+            if session._db_conversation_id:
+                _ms = int((_time.time() - _turn_start) * 1000)
+                db_tracker.track_full_turn(phone_number, message_body, response,
+                    session._db_conversation_id, session.message_count, next_state.value,
+                    intent="confirmation", category=session.problem_category, processing_time_ms=_ms)
+            return response
+
         # Check if user is providing more problem details instead of confirmation
-        # (e.g., saying "gps error mulu" when bot asked "jelaskan lebih detail")
-        detail_keywords = ['error', 'rusak', 'mogok', 'mati', 'offline', 'tidak bisa', 'problema', 'masalah', 'issue', 'gagal', 'failed']
+        # Only triggers for substantive new info, NOT short "tidak/2/ya/1" responses
+        detail_keywords = ['error', 'rusak', 'mogok', 'mati', 'offline', 'gagal', 'failed', 'problema']
         is_detail_response = any(keyword in message_lower for keyword in detail_keywords)
+        is_short_response = len(message_body.strip()) < 15
         
-        if is_detail_response and len(message_body) > 5:
+        # Only treat as new detail if it's a substantive response, NOT a short confirmation
+        # "tidak, masih error" (16 chars) should be handled as confirmation, not new detail
+        if is_detail_response and not is_short_response and not is_negative_confirm:
             # User is providing detail, not confirmation - re-process as problem detail
             session.problem_description = message_body.strip()
             
@@ -738,11 +1009,6 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
                 f"Kami akan menghubungi Anda berdasarkan detail yang Anda berikan.\n\n"
                 f"Terima kasih telah melaporkan! 🙏"
             )
-            
-            session.add_message(sender="bot", message=response, intent="ticket_created", category=session.problem_category)
-            
-            # Save session to database with ticket ID and closed state
-            get_session_manager().save_session(session)
             
             # ===== DB TRACKING: ticket + resolution + analytics =====
             _user_id = db_tracker.get_or_create_user(phone_number, session.driver_name)
