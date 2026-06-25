@@ -209,6 +209,19 @@ class DialogFlowDispatcher:
                 session.problem_category,
             )
 
+        # Handle "makasih" / "terima kasih" response after ticket creation
+        if state == DialogState.CLOSED:
+            clean_lower = clean.lower().strip()
+            thanks_keywords = ['makasih', 'terima kasih', 'thanks', 'thank you', 'sama-sama', 'sip', 'oke', 'ok', 'siap']
+            # Check if user is just saying thanks/goodbye
+            if any(kw in clean_lower for kw in thanks_keywords) and len(clean_lower) < 30:
+                return DialogTurnResult(
+                    "Sama-sama! 😊 Kalau ada masalah lagi, jangan sungkan hubungi kami ya. Semoga hari Anda menyenangkan! 🙏",
+                    DialogState.CLOSED,
+                    "thanks",
+                    session.problem_category,
+                )
+
         return DialogTurnResult(
             "Percakapan sebelumnya sudah selesai. Kirim *menu* untuk memulai laporan baru.",
             state,

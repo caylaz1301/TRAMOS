@@ -997,7 +997,10 @@ async def _create_ticket_from_session(session, phone_number: str, user_name: str
             session.ticket_id = result.ticket_id
             session.ticket_created = True
             session.current_state = DialogState.CLOSED
-            
+
+            # Save session with CLOSED state so subsequent messages work correctly
+            get_session_manager().save_session(session)
+
             response = (
                 f"✅ **Tiket Berhasil Dibuat!**\n\n"
                 f"📌 Nomor Tiket: #{result.ticket_id}\n"

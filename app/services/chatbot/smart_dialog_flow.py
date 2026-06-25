@@ -865,6 +865,14 @@ class SmartDialogFlowHandler:
                         hour += 12
                 time_text = f"{hour:00}:00"
 
+        # Cek "X hari yang lalu" atau "X hari lalu" (misal: "2 hari yang lalu", "3 hari lalu")
+        elif re.search(r'(\d+)\s*hari\s*(yang)?\s*lalu', user_input):
+            match = re.search(r'(\d+)\s*hari\s*(yang)?\s*lalu', user_input)
+            days_ago = int(match.group(1))
+            from datetime import date, timedelta
+            past_date = date.today() - timedelta(days=days_ago)
+            time_text = f"{past_date.strftime('%d/%m')}, {days_ago} hari lalu"
+
         # Cek kemarin dengan waktu
         elif 'kemarin' in user_input:
             from datetime import date, timedelta
@@ -938,6 +946,19 @@ class SmartDialogFlowHandler:
                 time_text = f"{day:02d}/{month:02d}"
             else:
                 time_text = f"{day:02d}"
+
+        # Cek tanggal spesifik langsung "23 Juni" tanpa prefix "tgl"
+        elif re.search(r'^(\d{1,2})\s+(juni|juli|agustus|september|oktober|november|desember|januari|februari|maret|april|mei)$', user_input, re.IGNORECASE):
+            date_match = re.search(r'^(\d{1,2})\s+(juni|juli|agustus|september|oktober|november|desember|januari|februari|maret|april|mei)$', user_input, re.IGNORECASE)
+            day = int(date_match.group(1))
+            bulan_str = date_match.group(2).lower()
+            bulan_map = {
+                'juni': 6, 'juli': 7, 'agustus': 8, 'september': 9, 'oktober': 10, 'november': 11, 'desember': 12,
+                'januari': 1, 'februari': 2, 'maret': 3, 'april': 4, 'mei': 5
+            }
+            month = bulan_map.get(bulan_str)
+            if month:
+                time_text = f"{day:02d}/{month:02d}"
 
         # Waktu umum: pagi, siang, sore, malam
         else:
