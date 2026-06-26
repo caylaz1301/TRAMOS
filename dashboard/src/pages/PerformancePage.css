@@ -254,7 +254,113 @@
   color: var(--text-secondary);
 }
 
-/* ── Donut Chart ── */
+/* ── Funnel Chart ── */
+.funnel-chart-wrap {
+  padding: 16px;
+  height: 240px;
+}
+
+.funnel-summary {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.funnel-stat {
+  text-align: center;
+}
+
+.funnel-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: block;
+}
+
+.funnel-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* ── Breakdown List ── */
+.breakdown-list {
+  padding: 12px 0;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background var(--t-fast);
+}
+
+.breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.breakdown-item:hover {
+  background: var(--bg-surface);
+}
+
+.breakdown-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.breakdown-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.breakdown-dot.green { background: #10b981; }
+.breakdown-dot.amber { background: #f59e0b; }
+.breakdown-dot.rose { background: #ef4444; }
+.breakdown-dot.blue { background: #3b82f6; }
+
+.breakdown-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.breakdown-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 40px;
+  text-align: right;
+}
+
+.breakdown-pct {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ── Radar Chart ── */
+.radar-card {
+  min-height: 350px;
+}
+
+.radar-chart-wrap {
+  padding: 20px;
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Donut Chart (legacy) ── */
 .donut-wrap {
   padding: 16px;
   height: 220px;

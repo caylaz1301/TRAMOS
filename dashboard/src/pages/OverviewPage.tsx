@@ -62,6 +62,7 @@ function aggregateToDaily(timeline: any[]) {
 export default function OverviewPage() {
   const [data, setData] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
+  const [liveSessions, setLiveSessions] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ startDate: null as string | null, endDate: null as string | null });
@@ -69,11 +70,13 @@ export default function OverviewPage() {
   const fetchData = async () => {
     try {
       setError(null);
-      const [dashData, timelineData] = await Promise.all([
+      const [dashData, timelineData, liveData] = await Promise.all([
         analyticsService.getDashboard(dateRange.startDate, dateRange.endDate),
         analyticsService.getTimeline(dateRange.startDate, dateRange.endDate).catch(() => null),
+        analyticsService.getLiveSessions().catch(() => null),
       ]);
       setData(dashData);
+      setLiveSessions(liveData);
       if (timelineData?.timeline) {
         setTimeline(timelineData.timeline);
       } else {
@@ -130,16 +133,17 @@ export default function OverviewPage() {
   const successRate = overview.success_rate || 0;
   const avgMessages = overview.avg_messages_per_session || 0;
 
-  // Quality metrics
-  const completionRate = quality.completion_rate || 0;
-  const rawDurationSec = quality.avg_duration_seconds || 0;
-  const avgDurationSec = Math.min(Math.max(rawDurationSec, 0), 3600);
-  const avgDurationMin = Math.round(avgDurationSec / 60);
-  const abandoned = quality.abandoned_sessions || 0;
-  const completedSessions = quality.completed_sessions || 0;
+  // Live Sessions
+  const liveCount = liveSessions?.active_count || 0;
+
+  // Donut: Top 3 categories + "Lainnya"
+  const sortedCategories = [...categories].sort((a: any, b: any) => b.count - a.count);
+  const top3Categories = sortedCategories.slice(0, 3);
+  const otherCount = sortedCategories.slice(3).reduce((sum: number, c: any) => sum + c.count, 0);
+  const donutCategories = otherCount > 0 ? [...top3Categories, { name: 'Lainnya', count: otherCount }] : top3Categories;
 
   // Totals untuk validasi
-  const totalFromDonut = categories.reduce((sum: number, c: any) => sum + c.count, 0);
+  const totalFromDonut = donutCategories.reduce((sum: number, c: any) => sum + c.count, 0);
   const totalFromSeverity = severity.reduce((sum: number, s: any) => sum + s.count, 0);
   const ticketByCategory = tickets.by_category || [];
   const totalTicketCount = tickets.total_tickets || 0;
@@ -202,13 +206,13 @@ export default function OverviewPage() {
   // Category colors
   const catColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#f97316', '#06b6d4', '#ec4899', '#14b8a6', '#84cc16'];
 
-  // Category Donut
+  // Category Donut - Top 3 + Lainnya
   const donutData = {
-    labels: categories.map((c: any) => c.name || 'Lainnya'),
+    labels: donutCategories.map((c: any) => c.name || 'Lainnya'),
     datasets: [
       {
-        data: categories.map((c: any) => c.count),
-        backgroundColor: categories.map((_: any, i: number) => catColors[i % catColors.length]),
+        data: donutCategories.map((c: any) => c.count),
+        backgroundColor: donutCategories.map((_: any, i: number) => catColors[i % catColors.length]),
         borderColor: '#ffffff',
         borderWidth: 3,
         hoverBorderWidth: 0,
@@ -433,14 +437,14 @@ export default function OverviewPage() {
 
       {/* Charts Row */}
       <div className="overview-charts">
-        {/* Category Donut */}
+        {/* Category Donut - Top 3 + Lainnya */}
         <div className="card">
           <div className="card-header">
             <h2>Kategori Masalah</h2>
-            <span className="card-badge">{categories.length} kategori</span>
+            <span className="card-badge">Top {donutCategories.length}</span>
           </div>
           <div className="chart-donut-wrap">
-            {categories.length > 0 ? (
+            {donutCategories.length > 0 ? (
               <Doughnut data={donutData} options={donutOpts} />
             ) : (
               <div className="no-data">Belum ada data</div>
@@ -468,35 +472,33 @@ export default function OverviewPage() {
           </div>
         </div>
 
-        {/* Quality Stats */}
-        <div className="card quality-card">
+        {/* Sesi Aktif Live Card */}
+        <div className="card sesi-aktif-card">
           <div className="card-header">
-            <h2>Kualitas Sesi</h2>
+            <h2>Sesi Aktif</h2>
+            <span className="live-badge">
+              <span className="live-dot-animated" />
+              LIVE
+            </span>
           </div>
-          <div className="quality-list">
-            <div className="quality-row quality-emerald">
-              <div className="quality-left">
-                <div className="quality-val">{Math.round(completionRate)}%</div>
-                <div className="quality-label">Sesi Selesai</div>
+          <div className="sesi-aktif-content">
+            <div className="sesi-aktif-count">{liveCount}</div>
+            <div className="sesi-aktif-label">percakapan aktif</div>
+            {liveSessions?.sessions && liveSessions.sessions.length > 0 ? (
+              <div className="sesi-aktif-list">
+                {liveSessions.sessions.slice(0, 3).map((s: any, i: number) => (
+                  <div key={i} className="sesi-aktif-item">
+                    <span className="sesi-aktif-name">{s.name || 'User'}</span>
+                    <span className="sesi-aktif-time">{s.minutes_ago}m lalu</span>
+                  </div>
+                ))}
+                {liveSessions.sessions.length > 3 && (
+                  <div className="sesi-aktif-more">+{liveSessions.sessions.length - 3} lagi</div>
+                )}
               </div>
-              <div className="quality-desc">Persentase sesi terselesaikan</div>
-            </div>
-            <div className="quality-row quality-blue">
-              <div className="quality-left">
-                <div className="quality-val">
-                  {avgDurationMin === 0 ? '<1m' : avgDurationMin < 60 ? `${avgDurationMin}m` : `${Math.floor(avgDurationMin / 60)}j${avgDurationMin % 60 > 0 ? ` ${avgDurationMin % 60}m` : ''}`}
-                </div>
-                <div className="quality-label">Durasi Rata-rata</div>
-              </div>
-              <div className="quality-desc">Waktu per percakapan</div>
-            </div>
-            <div className="quality-row quality-rose">
-              <div className="quality-left">
-                <div className="quality-val">{abandoned}</div>
-                <div className="quality-label">Dibatalkan</div>
-              </div>
-              <div className="quality-desc">Sesi tidak dilanjutkan</div>
-            </div>
+            ) : (
+              <div className="sesi-aktif-empty">Tidak ada sesi aktif</div>
+            )}
           </div>
         </div>
       </div>

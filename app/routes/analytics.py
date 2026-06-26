@@ -1061,6 +1061,111 @@ async def get_ml_insights(start_date: str = None, end_date: str = None, db: Sess
 
 
 # ============================================================================
+# LIVE SESSIONS - Real-time active sessions
+# ============================================================================
+
+@router.get("/live-sessions")
+async def get_live_sessions(db: Session = Depends(get_db)):
+    """Get real-time count of active sessions (last 5 minutes)"""
+    try:
+        five_min_ago = datetime.now() - timedelta(minutes=5)
+        active_sessions = db.query(WhatsAppSession).filter(
+            WhatsAppSession.last_activity >= five_min_ago,
+            WhatsAppSession.is_active == True
+        ).all()
+
+        return {
+            "active_count": len(active_sessions),
+            "sessions": [
+                {
+                    "session_id": s.session_id,
+                    "phone": s.phone_number,
+                    "name": s.driver_name,
+                    "state": s.current_state,
+                    "created_at": (s.created_at.isoformat() + "Z") if s.created_at else None,
+                    "minutes_ago": int((datetime.now() - s.last_activity).total_seconds() / 60) if s.last_activity else 0
+                }
+                for s in active_sessions
+            ],
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting live sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# CATEGORY FLOW - For Sankey diagram
+# ============================================================================
+
+@router.get("/category-flow")
+async def get_category_flow(start_date: str = None, end_date: str = None, db: Session = Depends(get_db)):
+    """Get category to outcome flow for Sankey diagram"""
+    try:
+        base_query = db.query(WhatsAppSession).filter(
+            WhatsAppSession.problem_category.isnot(None)
+        )
+        filtered_query = apply_date_filter(base_query, WhatsAppSession, start_date, end_date)
+        sessions = filtered_query.all()
+
+        # Build flow data: category -> outcome
+        flow_data = {}
+        for s in sessions:
+            category = s.problem_category or "Unknown"
+
+            # Determine outcome
+            if s.ticket_id:
+                outcome = "Dieskalasi"
+            elif s.current_state in ["resolved", "closed"]:
+                outcome = "Selesai AI"
+            else:
+                outcome = "Lainnya"
+
+            key = (category, outcome)
+            flow_data[key] = flow_data.get(key, 0) + 1
+
+        # Convert to sankey format
+        nodes = []
+        categories = set()
+        outcomes = set()
+        links = []
+
+        for (cat, outcome), count in flow_data.items():
+            categories.add(cat)
+            outcomes.add(outcome)
+
+        # Create nodes
+        for cat in sorted(categories):
+            nodes.append({"name": cat})
+        for outcome in sorted(outcomes):
+            nodes.append({"name": outcome})
+
+        # Create links
+        cat_index = {cat: i for i, cat in enumerate(sorted(categories))}
+        outcome_index = {out: i + len(categories) for i, out in enumerate(sorted(outcomes))}
+
+        for (cat, outcome), count in flow_data.items():
+            links.append({
+                "source": cat_index[cat],
+                "target": outcome_index[outcome],
+                "value": count
+            })
+
+        return {
+            "nodes": nodes,
+            "links": links,
+            "summary": {
+                "total_sessions": len(sessions),
+                "resolved_by_ai": sum(1 for s in sessions if not s.ticket_id and s.current_state in ["resolved", "closed"]),
+                "escalated": sum(1 for s in sessions if s.ticket_id)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting category flow: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # ACTIVITY LOG - Recent events timeline
 # ============================================================================
 

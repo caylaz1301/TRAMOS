@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { analyticsService } from '../api.js';
-import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, RadarController, RadialLinearScale, Tooltip, Legend } from 'chart.js';
+import { Bar, Radar } from 'react-chartjs-2';
 import DateFilter from '../components/DateFilter';
 import './PerformancePage.css';
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, RadarController, RadialLinearScale, Tooltip, Legend);
 
 const CHART_TOOLTIP = {
   backgroundColor: '#ffffff',
@@ -81,6 +81,7 @@ const Icons = {
 
 export default function PerformancePage() {
   const [dashboard, setDashboard] = useState<any>(null);
+  const [funnelData, setFunnelData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ startDate: null as string | null, endDate: null as string | null });
@@ -91,9 +92,13 @@ export default function PerformancePage() {
     async function fetchData() {
       try {
         setError(null);
-        const dashData = await analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null);
+        const [dashData, funnel] = await Promise.all([
+          analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
+          analyticsService.getFunnel().catch(() => null),
+        ]);
         if (!cancelled) {
           setDashboard(dashData);
+          setFunnelData(funnel);
         }
       } catch {
         if (!cancelled) {
@@ -193,6 +198,135 @@ export default function PerformancePage() {
     },
   ];
 
+  // FUNNEL DATA from API
+  const funnelChartData = funnelData?.series?.[0]?.data || [];
+  const funnelLabels = funnelChartData.map((d: any) => d.name);
+  const funnelValues = funnelChartData.map((d: any) => d.value);
+
+  // Convert funnel to horizontal bar (visual representation)
+  const maxFunnelValue = Math.max(...funnelValues, 1);
+  const funnelBarData = {
+    labels: funnelLabels,
+    datasets: [
+      {
+        data: funnelValues,
+        backgroundColor: funnelValues.map((_: any, i: number) => {
+          const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'];
+          return colors[i % colors.length];
+        }),
+        borderRadius: 8,
+        borderSkipped: false,
+      },
+    ],
+  };
+
+  const funnelBarOpts = {
+    indexAxis: 'y' as const,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        ...CHART_TOOLTIP,
+        callbacks: {
+          afterBody: function (tooltipItems: any[]) {
+            const idx = tooltipItems[0].dataIndex;
+            const val = funnelValues[idx];
+            const pct = maxFunnelValue > 0 ? Math.round((val / maxFunnelValue) * 100) : 0;
+            return [`${val} sesi (${pct}%)`];
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        beginAtZero: true,
+        grid: { color: '#f3f4f6' },
+        ticks: { color: '#9ca3af' }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { color: '#6b7280', font: { size: 12, weight: 500 } }
+      },
+    },
+  };
+
+  // RADAR CHART for benchmark comparison
+  const radarLabels = ['AI Resolution', 'Completion', 'Response Time', 'Abandonment Rate', 'Message Efficiency'];
+  const radarCurrent = [
+    aiResolutionRate,
+    completionRate,
+    Math.max(0, 100 - (avgDurationSec / 60) * 10), // Response time score
+    Math.max(0, 100 - abandonmentRate),
+    messageEfficiency
+  ];
+  const radarTarget = [70, 80, 80, 90, 70]; // Target values
+
+  const radarData = {
+    labels: radarLabels,
+    datasets: [
+      {
+        label: 'Current',
+        data: radarCurrent,
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: '#3b82f6',
+        borderWidth: 2,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+      },
+      {
+        label: 'Target',
+        data: radarTarget,
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        borderColor: '#10b981',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 3,
+      },
+    ],
+  };
+
+  const radarOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: { color: '#6b7280', font: { size: 11 }, padding: 16, usePointStyle: true }
+      },
+      tooltip: {
+        ...CHART_TOOLTIP,
+        callbacks: {
+          label: function (context: any) {
+            return `${context.dataset.label}: ${Math.round(context.raw)}%`;
+          },
+        },
+      },
+    },
+    scales: {
+      r: {
+        beginAtZero: true,
+        max: 100,
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        angleLines: { color: 'rgba(0,0,0,0.05)' },
+        pointLabels: {
+          color: '#6b7280',
+          font: { size: 11, weight: 500 }
+        },
+        ticks: {
+          color: '#9ca3af',
+          backdropColor: 'transparent',
+          stepSize: 25
+        }
+      },
+    },
+  };
+
   // RESOLUTION BREAKDOWN
   const resolutionData = {
     aiSolved: aiResolved,
@@ -200,69 +334,6 @@ export default function PerformancePage() {
     abandoned: abandoned,
     active: activeSessions,
     total: totalSessions,
-  };
-
-  const donutData = {
-    labels: ['AI Selesai', 'Tiket', 'Batal', 'Aktif'],
-    datasets: [
-      {
-        data: [resolutionData.aiSolved, resolutionData.tickets, resolutionData.abandoned, resolutionData.active],
-        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#3b82f6'],
-        borderColor: '#ffffff',
-        borderWidth: 3,
-      },
-    ],
-  };
-
-  const donutOpts = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '65%',
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
-        labels: { color: '#9ca3af', font: { size: 11, weight: 500 }, padding: 10, usePointStyle: true, pointStyleWidth: 8 },
-      },
-      tooltip: {
-        ...CHART_TOOLTIP,
-        callbacks: {
-          label: function (context: any) {
-            const value = context.raw as number;
-            const total = resolutionData.total || 1;
-            const pct = Math.round((value / total) * 100);
-            return `${context.label}: ${value} (${pct}%)`;
-          },
-        },
-      },
-    },
-  };
-
-  // SEVERITY DISTRIBUTION
-  const sevMap: Record<string, string> = { critical: 'Kritis', high: 'Tinggi', medium: 'Sedang', normal: 'Normal', low: 'Rendah' };
-  const sevColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#f59e0b', normal: '#3b82f6', low: '#10b981' };
-
-  const sevBarData = {
-    labels: severity.map((s: any) => sevMap[s.name] || s.name || 'Lain'),
-    datasets: [
-      {
-        data: severity.map((s: any) => s.count),
-        backgroundColor: severity.map((s: any) => sevColors[s.name] || '#5a6d84'),
-        borderRadius: 6,
-        borderSkipped: false,
-        barThickness: 28,
-      },
-    ],
-  };
-
-  const sevBarOpts = {
-    indexAxis: 'y' as const,
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: CHART_TOOLTIP },
-    scales: {
-      x: { beginAtZero: true, grid: { color: '#f3f4f6' }, ticks: { color: '#9ca3af', stepSize: 1 } },
-      y: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 12, weight: 500 } } },
-    },
   };
 
   // RECOMMENDATIONS
@@ -363,7 +434,7 @@ export default function PerformancePage() {
 
           {/* Main Content Grid */}
           <div className="perf-main-grid">
-            {/* Left: Score + Donut */}
+            {/* Left: Score + Funnel */}
             <div className="perf-left">
               {/* Score Card */}
               <div className="card score-card">
@@ -393,77 +464,83 @@ export default function PerformancePage() {
                 </div>
               </div>
 
-              {/* Resolution Donut */}
+              {/* Resolution Funnel */}
               <div className="card">
                 <div className="card-header">
-                  <h2>Breakdown Sesi</h2>
-                  <span className="card-badge">{totalSessions} total</span>
+                  <h2>Funnel Resolusi</h2>
+                  <span className="card-badge">{totalSessions} sesi</span>
                 </div>
-                <div className="donut-wrap">
-                  <Doughnut data={donutData} options={donutOpts} />
+                <div className="funnel-chart-wrap">
+                  {funnelLabels.length > 0 ? (
+                    <Bar data={funnelBarData} options={funnelBarOpts} />
+                  ) : (
+                    <div className="no-data">Belum ada data funnel</div>
+                  )}
                 </div>
-                <div className="breakdown-legend">
-                  <div className="legend-item">
-                    <span className="dot green" />
-                    AI Selesai: {resolutionData.aiSolved}
+                <div className="funnel-summary">
+                  <div className="funnel-stat">
+                    <span className="funnel-stat-value">{aiResolved}</span>
+                    <span className="funnel-stat-label">Diselesaikan AI</span>
                   </div>
-                  <div className="legend-item">
-                    <span className="dot amber" />
-                    Tiket: {resolutionData.tickets}
-                  </div>
-                  <div className="legend-item">
-                    <span className="dot rose" />
-                    Batal: {resolutionData.abandoned}
-                  </div>
-                  <div className="legend-item">
-                    <span className="dot blue" />
-                    Aktif: {resolutionData.active}
+                  <div className="funnel-stat">
+                    <span className="funnel-stat-value">{totalTickets}</span>
+                    <span className="funnel-stat-label">Dieskalasi</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Severity + Quality Stats */}
+            {/* Right: Session Breakdown */}
             <div className="perf-right">
-              {/* Severity */}
+              {/* Session Breakdown */}
               <div className="card">
                 <div className="card-header">
-                  <h2>Distribusi Urgensi</h2>
-                  <span className="card-badge">{severity.reduce((a: number, s: any) => a + s.count, 0)}</span>
+                  <h2>Session Breakdown</h2>
                 </div>
-                <div className="sev-chart-wrap">
-                  {severity.length > 0 ? (
-                    <Bar data={sevBarData} options={sevBarOpts} />
-                  ) : (
-                    <div className="no-data">Belum ada data urgensi</div>
-                  )}
+                <div className="breakdown-list">
+                  <div className="breakdown-item">
+                    <div className="breakdown-left">
+                      <span className="breakdown-dot green" />
+                      <span className="breakdown-label">AI Selesai</span>
+                    </div>
+                    <span className="breakdown-value">{resolutionData.aiSolved}</span>
+                    <span className="breakdown-pct">{totalSessions > 0 ? Math.round((resolutionData.aiSolved / totalSessions) * 100) : 0}%</span>
+                  </div>
+                  <div className="breakdown-item">
+                    <div className="breakdown-left">
+                      <span className="breakdown-dot amber" />
+                      <span className="breakdown-label">Dieskalasi</span>
+                    </div>
+                    <span className="breakdown-value">{resolutionData.tickets}</span>
+                    <span className="breakdown-pct">{totalSessions > 0 ? Math.round((resolutionData.tickets / totalSessions) * 100) : 0}%</span>
+                  </div>
+                  <div className="breakdown-item">
+                    <div className="breakdown-left">
+                      <span className="breakdown-dot rose" />
+                      <span className="breakdown-label">Dibatalkan</span>
+                    </div>
+                    <span className="breakdown-value">{resolutionData.abandoned}</span>
+                    <span className="breakdown-pct">{totalSessions > 0 ? Math.round((resolutionData.abandoned / totalSessions) * 100) : 0}%</span>
+                  </div>
+                  <div className="breakdown-item">
+                    <div className="breakdown-left">
+                      <span className="breakdown-dot blue" />
+                      <span className="breakdown-label">Aktif</span>
+                    </div>
+                    <span className="breakdown-value">{resolutionData.active}</span>
+                    <span className="breakdown-pct">{totalSessions > 0 ? Math.round((resolutionData.active / totalSessions) * 100) : 0}%</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Quality Stats */}
-              <div className="card quality-card">
+              {/* Radar Chart - Benchmark */}
+              <div className="card radar-card">
                 <div className="card-header">
-                  <h2>Statistik Kualitas</h2>
+                  <h2>Benchmark vs Target</h2>
+                  <span className="card-badge">Radar</span>
                 </div>
-                <div className="quality-grid">
-                  <div className="quality-item">
-                    <div className="quality-label">Durasi Rata-rata</div>
-                    <div className="quality-value">
-                      {avgDurationMin === 0 ? '<1m' : avgDurationMin < 60 ? `${avgDurationMin}m` : `${Math.floor(avgDurationMin / 60)}j ${avgDurationMin % 60}m`}
-                    </div>
-                  </div>
-                  <div className="quality-item">
-                    <div className="quality-label">Pesan per Sesi</div>
-                    <div className="quality-value">{Math.round(avgMessages)}</div>
-                  </div>
-                  <div className="quality-item">
-                    <div className="quality-label">Total Pesan</div>
-                    <div className="quality-value">{totalMessages.toLocaleString('id-ID')}</div>
-                  </div>
-                  <div className="quality-item">
-                    <div className="quality-label">Completion Rate</div>
-                    <div className="quality-value">{Math.round(completionRate)}%</div>
-                  </div>
+                <div className="radar-chart-wrap">
+                  <Radar data={radarData} options={radarOpts} />
                 </div>
               </div>
             </div>
@@ -490,42 +567,6 @@ export default function PerformancePage() {
                   <p>Tidak ada saran kritis saat ini. AI berjalan dengan baik.</p>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Benchmark Comparison */}
-          <div className="card benchmark-card">
-            <div className="card-header">
-              <h2>Benchmark Industri</h2>
-              <span className="card-badge">Perbandingan</span>
-            </div>
-            <div className="benchmark-list">
-              {benchmarks.map((b, i) => {
-                const isGood = b.inverse ? b.current <= b.target : b.current >= b.target;
-                const progress = b.inverse
-                  ? Math.max(0, 100 - ((b.current - b.target) / b.target) * 100)
-                  : Math.min(100, (b.current / b.target) * 100);
-                return (
-                  <div key={i} className="benchmark-row">
-                    <div className="benchmark-label">{b.label}</div>
-                    <div className="benchmark-values">
-                      <span className={`benchmark-current ${isGood ? 'good' : 'warn'}`}>
-                        {b.current}
-                        {b.unit}
-                      </span>
-                      <span className="benchmark-sep">/</span>
-                      <span className="benchmark-target">
-                        {b.target}
-                        {b.unit}
-                      </span>
-                    </div>
-                    <div className="benchmark-bar">
-                      <div className={`benchmark-fill ${isGood ? 'fill-good' : 'fill-warn'}`} style={{ width: `${Math.min(100, progress)}%` }} />
-                    </div>
-                    <span className={`benchmark-status ${isGood ? 'status-good' : 'status-warn'}`}>{isGood ? Icons.check : Icons.warning}</span>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </>

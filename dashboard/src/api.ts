@@ -328,7 +328,34 @@ export const analyticsService = {
     if (endDate) params.end_date = endDate;
     const response = await api.get('/analytics/stats/timeline', { params });
     return response.data;
-  }
+  },
+
+  // Live Sessions - Real-time active sessions
+  getLiveSessions: async () => {
+    const response = await api.get('/analytics/live-sessions');
+    return response.data;
+  },
+
+  // Category Flow - For Sankey diagram
+  getCategoryFlow: async (startDate, endDate) => {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    const response = await api.get('/analytics/category-flow', { params });
+    return response.data;
+  },
+
+  // Heatmap data
+  getHeatmap: async () => {
+    const response = await api.get('/analytics/visualizations/heatmap');
+    return response.data;
+  },
+
+  // Funnel data
+  getFunnel: async () => {
+    const response = await api.get('/analytics/visualizations/funnel');
+    return response.data;
+  },
 };
 
 // Anomaly Detection Service

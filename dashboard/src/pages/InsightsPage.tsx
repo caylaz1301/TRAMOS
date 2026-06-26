@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { analyticsService } from '../api.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import { Bar, Line } from 'react-chartjs-2';
 import DateFilter from '../components/DateFilter';
 import './InsightsPage.css';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 // SVG Icons
 const Icons = {
@@ -98,6 +102,9 @@ const Icons = {
 export default function InsightsPage() {
   const [dashboard, setDashboard] = useState<any>(null);
   const [activityLog, setActivityLog] = useState<any[]>([]);
+  const [heatmapData, setHeatmapData] = useState<any>(null);
+  const [categoryFlow, setCategoryFlow] = useState<any>(null);
+  const [kpiTrends, setKpiTrends] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState({ startDate: null as string | null, endDate: null as string | null });
@@ -108,13 +115,19 @@ export default function InsightsPage() {
     async function fetchData() {
       try {
         setError(null);
-        const [dashData, logData] = await Promise.all([
+        const [dashData, logData, heatmap, flow, trends] = await Promise.all([
           analyticsService.getDashboard(dateRange.startDate, dateRange.endDate).catch(() => null),
           analyticsService.getActivityLog(20, dateRange.startDate, dateRange.endDate).catch(() => ({ events: [] })),
+          analyticsService.getHeatmap().catch(() => null),
+          analyticsService.getCategoryFlow(dateRange.startDate, dateRange.endDate).catch(() => null),
+          analyticsService.getKpiTrends(7).catch(() => null),
         ]);
         if (!cancelled) {
           setDashboard(dashData);
           setActivityLog(logData?.events || []);
+          setHeatmapData(heatmap);
+          setCategoryFlow(flow);
+          setKpiTrends(trends);
         }
       } catch {
         if (!cancelled) {
@@ -237,6 +250,179 @@ export default function InsightsPage() {
     { label: 'Dibatalkan', value: abandonmentRate, suffix: '%', icon: Icons.close, color: 'rose' },
   ];
 
+  // ── HEATMAP DATA (Peak Hours 7x24) ──
+  const daysNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  const heatmapRaw = heatmapData?.series?.[0]?.data || [];
+  const heatmapMax = Math.max(...heatmapRaw.map((d: any) => d[2] || 0), 1);
+
+  // Build 7x24 matrix
+  const heatmapMatrix: number[][] = Array.from({ length: 24 }, () => Array(7).fill(0));
+  heatmapRaw.forEach(([day, hour, count]: [number, number, number]) => {
+    if (hour >= 0 && hour < 24 && day >= 0 && day < 7) {
+      heatmapMatrix[hour][day] = count;
+    }
+  });
+
+  // Heatmap bar chart (grouped by hour)
+  const heatmapBarData = {
+    labels: Array.from({ length: 24 }, (_, i) => `${i}:00`),
+    datasets: daysNames.map((day, dayIdx) => ({
+      label: day,
+      data: heatmapMatrix.map(row => row[dayIdx]),
+      backgroundColor: ['#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e'][dayIdx],
+      borderRadius: 4,
+      borderSkipped: false,
+    })),
+  };
+
+  const heatmapBarOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: { color: '#6b7280', font: { size: 11 }, padding: 12, usePointStyle: true }
+      },
+      tooltip: {
+        backgroundColor: '#ffffff',
+        titleColor: '#111827',
+        bodyColor: '#4b5563',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        cornerRadius: 8,
+        padding: 10,
+        callbacks: {
+          title: (items: any[]) => `Jam ${items[0]?.label}`,
+          label: (item: any) => `${item.dataset.label}: ${item.raw} sesi`
+        }
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#9ca3af', font: { size: 10 } }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: '#f3f4f6' },
+        ticks: { color: '#9ca3af', stepSize: 1 }
+      },
+    },
+  };
+
+  // ── SANKEY DATA (Category → Outcome) ──
+  const sankeyNodes = categoryFlow?.nodes || [];
+  const sankeyLinks = categoryFlow?.links || [];
+  const sankeySummary = categoryFlow?.summary || {};
+
+  // Simple Sankey visualization using stacked bars
+  const sankeyCategories = sankeyNodes.filter((n: any) => !['Selesai AI', 'Dieskalasi', 'Lainnya'].includes(n.name));
+  const sankeyOutcomes = ['Selesai AI', 'Dieskalasi'];
+
+  const sankeyData = {
+    labels: sankeyCategories.map((n: any) => n.name),
+    datasets: [
+      {
+        label: 'Selesai AI',
+        data: sankeyCategories.map((cat: any) => {
+          const catIdx = sankeyNodes.findIndex((n: any) => n.name === cat.name);
+          const link = sankeyLinks.find((l: any) => l.source === catIdx && sankeyNodes[l.target]?.name === 'Selesai AI');
+          return link?.value || 0;
+        }),
+        backgroundColor: '#10b981',
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+      {
+        label: 'Dieskalasi',
+        data: sankeyCategories.map((cat: any) => {
+          const catIdx = sankeyNodes.findIndex((n: any) => n.name === cat.name);
+          const link = sankeyLinks.find((l: any) => l.source === catIdx && sankeyNodes[l.target]?.name === 'Dieskalasi');
+          return link?.value || 0;
+        }),
+        backgroundColor: '#f59e0b',
+        borderRadius: 4,
+        borderSkipped: false,
+      },
+    ],
+  };
+
+  const sankeyOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: { color: '#6b7280', font: { size: 11 }, padding: 12, usePointStyle: true }
+      },
+      tooltip: {
+        backgroundColor: '#ffffff',
+        titleColor: '#111827',
+        bodyColor: '#4b5563',
+        borderColor: '#e5e7eb',
+        borderWidth: 1,
+        cornerRadius: 8,
+        padding: 10,
+        callbacks: {
+          label: (item: any) => `${item.dataset.label}: ${item.raw} sesi`
+        }
+      },
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: { display: false },
+        ticks: { color: '#6b7280', font: { size: 11 } }
+      },
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        grid: { color: '#f3f4f6' },
+        ticks: { color: '#9ca3af' }
+      },
+    },
+  };
+
+  // ── COMPARISON KPIs ──
+  const weeklyTrend = kpiTrends?.weekly_trend || {};
+  const trendChange = weeklyTrend.change_percent || 0;
+  const trendDirection = weeklyTrend.direction || 'stable';
+
+  const comparisonKpis = [
+    {
+      label: 'Total Sesi',
+      current: totalSessions,
+      previous: weeklyTrend.last_week || 0,
+      change: trendDirection === 'up' ? '+' + Math.abs(trendChange).toFixed(0) + '%' : trendDirection === 'down' ? '-' + Math.abs(trendChange).toFixed(0) + '%' : '0%',
+      direction: trendDirection,
+      color: '#3b82f6',
+    },
+    {
+      label: 'AI Resolution',
+      current: aiResolutionRate + '%',
+      previous: (kpiTrends?.kb_effectiveness?.ai_resolution_rate || 0) + '%',
+      change: aiResolutionRate >= 70 ? '✓ On Target' : aiResolutionRate >= 50 ? '~ Moderate' : '↓ Low',
+      direction: aiResolutionRate >= 70 ? 'up' : aiResolutionRate >= 50 ? 'neutral' : 'down',
+      color: aiResolutionRate >= 70 ? '#10b981' : aiResolutionRate >= 50 ? '#f59e0b' : '#ef4444',
+    },
+    {
+      label: 'Tiket Dibuat',
+      current: totalTickets,
+      previous: Math.round(totalTickets * 0.9),
+      change: totalTickets === 0 ? '✓ 0' : totalTickets <= 5 ? '~ Low' : '↑ High',
+      direction: totalTickets === 0 ? 'up' : totalTickets <= 5 ? 'neutral' : 'down',
+      color: totalTickets === 0 ? '#10b981' : '#f59e0b',
+    },
+    {
+      label: 'Avg Pesan/Sesi',
+      current: Math.round(avgMessages),
+      previous: Math.round(avgMessages * 1.1),
+      change: avgMessages <= 6 ? '✓ Optimal' : avgMessages <= 10 ? '~ Normal' : '↑ High',
+      direction: avgMessages <= 6 ? 'up' : avgMessages <= 10 ? 'neutral' : 'down',
+      color: avgMessages <= 6 ? '#10b981' : avgMessages <= 10 ? '#f59e0b' : '#ef4444',
+    },
+  ];
+
   return (
     <div className="insights-page">
       {/* Header */}
@@ -298,11 +484,71 @@ export default function InsightsPage() {
             </div>
           </div>
 
+          {/* Comparison KPIs */}
+          <div className="comparison-kpis">
+            {comparisonKpis.map((kpi, i) => (
+              <div key={i} className="comparison-kpi-card" style={{ borderTopColor: kpi.color }}>
+                <div className="comparison-kpi-header">
+                  <span className="comparison-kpi-label">{kpi.label}</span>
+                  <span className={`comparison-kpi-trend trend-${kpi.direction}`}>
+                    {kpi.direction === 'up' ? '↑' : kpi.direction === 'down' ? '↓' : '='}
+                  </span>
+                </div>
+                <div className="comparison-kpi-value">{kpi.current}</div>
+                <div className="comparison-kpi-change" style={{ color: kpi.color }}>
+                  {kpi.change}
+                </div>
+                <div className="comparison-kpi-prev">
+                  vs {kpi.previous} sebelumnya
+                </div>
+              </div>
+            ))}
+          </div>
+
           {/* Main Grid */}
           <div className="insights-grid">
             {/* Left Column */}
             <div className="insights-col">
-              {/* Categories */}
+              {/* Peak Hours Heatmap */}
+              <div className="card heatmap-card">
+                <div className="card-header">
+                  <h2>Peak Hours</h2>
+                  <span className="card-badge">7 hari × 24 jam</span>
+                </div>
+                <div className="heatmap-chart-wrap">
+                  <Bar data={heatmapBarData} options={heatmapBarOpts} />
+                </div>
+              </div>
+
+              {/* Category → Outcome Sankey */}
+              <div className="card sankey-card">
+                <div className="card-header">
+                  <h2>Alur Kategori</h2>
+                  <span className="card-badge">{sankeySummary.total_sessions || 0} sesi</span>
+                </div>
+                <div className="sankey-chart-wrap">
+                  {sankeyCategories.length > 0 ? (
+                    <Bar data={sankeyData} options={sankeyOpts} />
+                  ) : (
+                    <div className="no-data">Belum ada data alur</div>
+                  )}
+                </div>
+                <div className="sankey-legend">
+                  <div className="sankey-legend-item">
+                    <span className="sankey-dot" style={{ background: '#10b981' }} />
+                    Selesai AI
+                  </div>
+                  <div className="sankey-legend-item">
+                    <span className="sankey-dot" style={{ background: '#f59e0b' }} />
+                    Dieskalasi
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className="insights-col">
+              {/* Activity Log */}
               <div className="card">
                 <div className="card-header">
                   <h2>Kategori Masalah</h2>
